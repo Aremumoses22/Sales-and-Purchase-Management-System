@@ -15,7 +15,7 @@ import { useRouter } from 'next/navigation';
 import { Controller, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { toast } from 'sonner';
 import type { z } from 'zod';
-import { CustomerCombobox } from '@/components/customer-combobox';
+import { CustomerCombobox } from '@/components/contact-combobox';
 import { LineItemsEditor } from '@/components/documents/line-items-editor';
 import { TotalsPanel } from '@/components/documents/totals-panel';
 import { EMPTY_LINE, type DocumentBodyValues } from '@/components/documents/types';

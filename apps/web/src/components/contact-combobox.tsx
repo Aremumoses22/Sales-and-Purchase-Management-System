@@ -6,18 +6,21 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useCustomer, useCustomers } from '@/features/customers/api';
+import type { ContactType } from '@spms/shared';
+import { CONTACT_LABELS, CONTACT_RESOURCES, useContact, useContacts } from '@/features/contacts/api';
 import { useCan } from '@/lib/session';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 
-/** Searchable picker over active customers. */
-export function CustomerCombobox({
+/** Searchable picker over active customers or vendors. */
+export function ContactCombobox({
+  type,
   id,
   value,
   onChange,
   invalid,
   disabled,
 }: {
+  type: ContactType;
   id?: string;
   value: string | null | undefined;
   onChange: (customerId: string) => void;
@@ -28,8 +31,9 @@ export function CustomerCombobox({
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState('');
   const debounced = useDebouncedValue(term);
-  const { data: selected } = useCustomer(value ?? '');
-  const { data } = useCustomers({ q: debounced, status: 'active', pageSize: 20, sort: 'name' }, open);
+  const labels = CONTACT_LABELS[type];
+  const { data: selected } = useContact(type, value ?? '');
+  const { data } = useContacts(type, { q: debounced, status: 'active', pageSize: 20, sort: 'name' }, open);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -48,15 +52,15 @@ export function CustomerCombobox({
         }
       >
         <span className={cn('truncate', !selected && 'text-muted-foreground')}>
-          {selected?.displayName ?? 'Select or search a customer'}
+          {selected?.displayName ?? `Select or search a ${labels.lower}`}
         </span>
         <ChevronsUpDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-(--anchor-width) min-w-72 p-0">
         <Command shouldFilter={false}>
-          <CommandInput placeholder="Search customers" value={term} onValueChange={setTerm} />
+          <CommandInput placeholder={`Search ${labels.many.toLowerCase()}`} value={term} onValueChange={setTerm} />
           <CommandList>
-            <CommandEmpty>No active customers match.</CommandEmpty>
+            <CommandEmpty>No active {labels.many.toLowerCase()} match.</CommandEmpty>
             {data?.data.length ? (
               <CommandGroup>
                 {data.data.map((customer) => (
@@ -80,18 +84,26 @@ export function CustomerCombobox({
               </CommandGroup>
             ) : null}
           </CommandList>
-          {can('customers:create') ? (
+          {can(`${CONTACT_RESOURCES[type]}:create`) ? (
             <Link
-              href="/customers/new"
+              href={`/${CONTACT_RESOURCES[type]}/new`}
               target="_blank"
               className="flex items-center gap-1.5 border-t px-3 py-2 text-sm text-primary hover:bg-muted/50"
             >
               <PlusIcon className="size-4" />
-              New customer
+              New {labels.lower}
             </Link>
           ) : null}
         </Command>
       </PopoverContent>
     </Popover>
   );
+}
+
+export function CustomerCombobox(props: Omit<Parameters<typeof ContactCombobox>[0], 'type'>) {
+  return <ContactCombobox type="customer" {...props} />;
+}
+
+export function VendorCombobox(props: Omit<Parameters<typeof ContactCombobox>[0], 'type'>) {
+  return <ContactCombobox type="vendor" {...props} />;
 }

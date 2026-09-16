@@ -79,6 +79,18 @@ function GlobalSearch() {
               ))}
             </CommandGroup>
           ) : null}
+          {data?.vendors.length ? (
+            <CommandGroup heading="Vendors">
+              {data.vendors.map((vendor) => (
+                <CommandItem key={vendor.id} value={`vendor-${vendor.id}`} onSelect={() => go(`/vendors/${vendor.id}`)}>
+                  {vendor.displayName}
+                  {vendor.companyName && vendor.companyName !== vendor.displayName ? (
+                    <span className="text-muted-foreground"> · {vendor.companyName}</span>
+                  ) : null}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
           {data?.items.length ? (
             <CommandGroup heading="Items">
               {data.items.map((item) => (
@@ -146,6 +158,7 @@ function QuickCreate() {
     { href: '/payments-received/new', label: 'Payment received', permission: 'payments_received:create' as const },
     { href: '/credit-notes/new', label: 'Credit note', permission: 'credit_notes:create' as const },
     { href: '/customers/new', label: 'Customer', permission: 'customers:create' as const },
+    { href: '/vendors/new', label: 'Vendor', permission: 'vendors:create' as const },
     { href: '/items/new', label: 'Item', permission: 'items:create' as const },
   ].filter((action) => can(action.permission));
 

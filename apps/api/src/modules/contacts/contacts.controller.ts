@@ -14,7 +14,7 @@ import { CONTACT_LABELS, ContactsService } from './contacts.service.js';
 
 const RESOURCES = { customer: 'customers', vendor: 'vendors' } as const;
 
-/** One controller definition for both customers and vendors (vendors arrive in Module 10). */
+/** One controller definition for both customers and vendors. */
 function contactController(type: ContactType) {
   const resource = RESOURCES[type];
   const can = (action: 'view' | 'create' | 'edit' | 'delete') => RequirePermissions(`${resource}:${action}`);
@@ -89,3 +89,4 @@ function contactController(type: ContactType) {
 }
 
 export const CustomersController = contactController('customer');
+export const VendorsController = contactController('vendor');

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { CustomerCombobox } from '@/components/customer-combobox';
+import { CustomerCombobox } from '@/components/contact-combobox';
 import { Field } from '@/components/field';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';

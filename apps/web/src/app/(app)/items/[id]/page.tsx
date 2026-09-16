@@ -186,6 +186,13 @@ export default function ItemDetailPage() {
                   <dl className="space-y-2">
                     <Row label="Cost price">{item.costPrice === null ? null : <Money value={item.costPrice} />}</Row>
                     <Row label="Description">{item.purchaseDescription}</Row>
+                    <Row label="Preferred vendor">
+                      {item.preferredVendor ? (
+                        <Link href={`/vendors/${item.preferredVendor.id}`} className="text-primary hover:underline">
+                          {item.preferredVendor.displayName}
+                        </Link>
+                      ) : null}
+                    </Row>
                   </dl>
                 </CardContent>
               </Card>

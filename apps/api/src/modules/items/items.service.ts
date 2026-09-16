@@ -22,7 +22,10 @@ import type { Item, Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { OrganizationService } from '../settings/organization.service.js';
 
-const ITEM_INCLUDE = { tax: { select: { id: true, name: true, rate: true } } } satisfies Prisma.ItemInclude;
+const ITEM_INCLUDE = {
+  tax: { select: { id: true, name: true, rate: true } },
+  preferredVendor: { select: { id: true, displayName: true } },
+} satisfies Prisma.ItemInclude;
 type ItemWithTax = Prisma.ItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 
 function toListItem(item: Item, stockOnHand: string | null): ItemListItemDto {
@@ -48,6 +51,7 @@ function toItemDto(item: ItemWithTax, stockOnHand: string | null): ItemDto {
     ...toListItem(item, stockOnHand),
     purchaseDescription: item.purchaseDescription,
     tax: item.tax ? { id: item.tax.id, name: item.tax.name, rate: quantity(item.tax.rate) } : null,
+    preferredVendor: item.preferredVendor,
     createdAt: toIso(item.createdAt),
     updatedAt: toIso(item.updatedAt),
   };
@@ -64,6 +68,7 @@ function auditSnapshot(item: ItemWithTax): Record<string, unknown> {
     costPrice: moneyOrNull(item.costPrice),
     purchaseDescription: item.purchaseDescription,
     tax: item.tax?.name ?? null,
+    preferredVendor: item.preferredVendor?.displayName ?? null,
     trackInventory: item.trackInventory,
     reorderLevel: quantityOrNull(item.reorderLevel),
   };
@@ -300,6 +305,7 @@ export class ItemsService {
       costPrice: input.costPrice,
       purchaseDescription: input.purchaseDescription,
       taxId: input.taxId,
+      preferredVendorId: input.preferredVendorId,
       trackInventory: tracking,
       reorderLevel: tracking ? input.reorderLevel : null,
     };
@@ -325,7 +331,7 @@ export class ItemsService {
 
   private async validate(input: ItemOutput, excludeId?: string): Promise<void> {
     const notSelf = excludeId ? { id: { not: excludeId } } : {};
-    const [nameClash, skuClash, tax] = await Promise.all([
+    const [nameClash, skuClash, tax, vendor] = await Promise.all([
       this.prisma.item.findFirst({
         where: { name: { equals: input.name, mode: 'insensitive' }, ...notSelf },
         select: { id: true },
@@ -337,9 +343,15 @@ export class ItemsService {
           })
         : null,
       input.taxId ? this.prisma.tax.findUnique({ where: { id: input.taxId }, select: { id: true } }) : null,
+      input.preferredVendorId
+        ? this.prisma.contact.findFirst({ where: { id: input.preferredVendorId, type: 'vendor' }, select: { id: true } })
+        : null,
     ]);
     if (nameClash) throw fieldError('ITEM_NAME_TAKEN', 'name', 'An item with this name already exists');
     if (skuClash) throw fieldError('SKU_TAKEN', 'sku', 'Another item already uses this SKU');
     if (input.taxId && !tax) throw fieldError('TAX_NOT_FOUND', 'taxId', 'Select a valid tax');
+    if (input.preferredVendorId && !vendor) {
+      throw fieldError('VENDOR_NOT_FOUND', 'preferredVendorId', 'Select a valid vendor');
+    }
   }
 }

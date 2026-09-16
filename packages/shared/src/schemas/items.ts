@@ -22,6 +22,7 @@ export const itemSchema = z
     costPrice: optionalMoneySchema,
     purchaseDescription: optionalText(2000),
     taxId: optionalIdSchema,
+    preferredVendorId: optionalIdSchema,
     trackInventory: z.boolean().default(false),
     /** Only used when inventory tracking is switched on. */
     openingStock: optionalQuantitySchema,

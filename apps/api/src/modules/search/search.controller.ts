@@ -21,7 +21,7 @@ export class SearchController {
     const can = (permission: AuthUserDto['permissions'][number]) => user.permissions.includes(permission);
     const contains = { contains: q, mode: 'insensitive' as const };
 
-    const [customers, items, quotes, invoices, creditNotes, salesReceipts] = await Promise.all([
+    const [customers, items, quotes, invoices, creditNotes, salesReceipts, vendors] = await Promise.all([
       can('customers:view')
         ? this.prisma.contact.findMany({
             where: { type: 'customer', OR: [{ displayName: contains }, { companyName: contains }, { email: contains }] },
@@ -70,10 +70,19 @@ export class SearchController {
             take: 5,
           })
         : [],
+      can('vendors:view')
+        ? this.prisma.contact.findMany({
+            where: { type: 'vendor', OR: [{ displayName: contains }, { companyName: contains }, { email: contains }] },
+            select: { id: true, displayName: true, companyName: true },
+            orderBy: { displayName: 'asc' },
+            take: 5,
+          })
+        : [],
     ]);
 
     return {
       customers,
+      vendors,
       items,
       quotes: quotes.map((quote) => ({ id: quote.id, number: quote.number, customerName: quote.customer.displayName })),
       invoices: invoices.map((invoice) => ({

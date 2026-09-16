@@ -8,6 +8,7 @@ import {
   type ContactListItemDto,
   type ContactOutput,
   type ContactSummaryDto,
+  type VendorSummaryDto,
   type ContactType,
   type Decimal,
   type Paginated,
@@ -177,8 +178,8 @@ export class ContactsService {
       this.prisma.contact.count({ where }),
     ]);
 
-    const balances =
-      type === 'customer' ? await this.invoiceBalances(rows.map((row) => row.id)) : new Map<string, Decimal>();
+    const ids = rows.map((row) => row.id);
+    const balances = type === 'customer' ? await this.invoiceBalances(ids) : await this.vendorBalances(ids);
 
     return paginated(
       rows.map((row) => ({
@@ -272,16 +273,7 @@ export class ContactsService {
 
   async remove(type: ContactType, id: string): Promise<void> {
     const contact = await this.find(type, id);
-    const [quotes, invoices, payments, creditNotes, salesReceipts, recurringProfiles] = await Promise.all([
-      this.prisma.quote.count({ where: { customerId: id } }),
-      this.prisma.invoice.count({ where: { customerId: id } }),
-      this.prisma.paymentReceived.count({ where: { customerId: id } }),
-      this.prisma.creditNote.count({ where: { customerId: id } }),
-      this.prisma.salesReceipt.count({ where: { customerId: id } }),
-      this.prisma.recurringInvoiceProfile.count({ where: { customerId: id } }),
-    ]);
-    const transactions = quotes + invoices + payments + creditNotes + salesReceipts + recurringProfiles;
-    if (transactions > 0) {
+    if ((await this.transactionCount(type, id)) > 0) {
       throw conflict(
         'CONTACT_HAS_TRANSACTIONS',
         `${contact.displayName} has transactions and cannot be deleted. Mark it as inactive instead.`,
@@ -296,18 +288,50 @@ export class ContactsService {
     });
   }
 
-  async summary(type: ContactType, id: string): Promise<ContactSummaryDto> {
+  async summary(type: ContactType, id: string): Promise<ContactSummaryDto | VendorSummaryDto> {
     const contact = await this.find(type, id);
-    const balances = type === 'customer' ? await this.invoiceBalances([id]) : new Map<string, Decimal>();
+    if (type === 'vendor') {
+      const payables = await this.vendorBalances([id]);
+      return {
+        outstandingPayables: money(toDecimal(contact.openingBalance).plus(payables.get(id) ?? 0)),
+        unusedCredits: money(await this.unusedVendorCredits(id)),
+      };
+    }
+    const balances = await this.invoiceBalances([id]);
     return {
       outstandingReceivables: money(toDecimal(contact.openingBalance).plus(balances.get(id) ?? 0)),
-      unusedCredits: type === 'customer' ? money(await this.unusedCredits(id)) : '0.00',
+      unusedCredits: money(await this.unusedCredits(id)),
     };
   }
 
   async history(type: ContactType, id: string): Promise<AuditLogDto[]> {
     await this.find(type, id);
     return this.audit.history(type, id);
+  }
+
+  private async transactionCount(type: ContactType, id: string): Promise<number> {
+    const counts =
+      type === 'customer'
+        ? await Promise.all([
+            this.prisma.quote.count({ where: { customerId: id } }),
+            this.prisma.invoice.count({ where: { customerId: id } }),
+            this.prisma.paymentReceived.count({ where: { customerId: id } }),
+            this.prisma.creditNote.count({ where: { customerId: id } }),
+            this.prisma.salesReceipt.count({ where: { customerId: id } }),
+            this.prisma.recurringInvoiceProfile.count({ where: { customerId: id } }),
+          ])
+        : await Promise.all([Promise.resolve(0)]);
+    return counts.reduce((sum, count) => sum + count, 0);
+  }
+
+  /** What is owed to each vendor on open bills (arrives with bills). */
+  private async vendorBalances(_vendorIds: string[]): Promise<Map<string, Decimal>> {
+    return new Map();
+  }
+
+  /** Payments made to a vendor that are not yet used on a bill (arrives with payments made). */
+  private async unusedVendorCredits(_vendorId: string): Promise<Decimal> {
+    return toDecimal(0);
   }
 
   /** What each customer still owes on sent invoices (drafts and void invoices are not owed). */

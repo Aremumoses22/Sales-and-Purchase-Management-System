@@ -219,6 +219,12 @@ export interface ContactSummaryDto {
   unusedCredits: string;
 }
 
+/** What the business owes a vendor, and payments made to them not yet used on a bill. */
+export interface VendorSummaryDto {
+  outstandingPayables: string;
+  unusedCredits: string;
+}
+
 // ---------- Items ----------
 
 export interface ItemListItemDto {
@@ -240,6 +246,7 @@ export interface ItemListItemDto {
 export interface ItemDto extends ItemListItemDto {
   purchaseDescription: string | null;
   tax: { id: string; name: string; rate: string } | null;
+  preferredVendor: { id: string; displayName: string } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -328,6 +335,7 @@ export interface SearchResultsDto {
   invoices: { id: string; number: string; customerName: string }[];
   creditNotes: { id: string; number: string; customerName: string }[];
   salesReceipts: { id: string; number: string; customerName: string }[];
+  vendors: { id: string; displayName: string; companyName: string | null }[];
 }
 
 export interface InvoiceListItemDto {

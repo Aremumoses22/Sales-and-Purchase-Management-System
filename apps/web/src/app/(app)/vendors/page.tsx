@@ -2,6 +2,6 @@
 
 import { ContactListPage } from '@/features/contacts/contact-list-page';
 
-export default function CustomersPage() {
-  return <ContactListPage type="customer" />;
+export default function VendorsPage() {
+  return <ContactListPage type="vendor" />;
 }

@@ -4,9 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ITEM_UNITS, itemSchema, type ItemDto } from '@spms/shared';
 import { Loader2Icon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import type { z } from 'zod';
+import { VendorCombobox } from '@/components/contact-combobox';
 import { Field, FormSection } from '@/components/field';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -32,6 +33,7 @@ function toFormValues(item: ItemDto | undefined): FormValues {
     costPrice: item?.costPrice ?? '',
     purchaseDescription: item?.purchaseDescription ?? '',
     taxId: item?.tax?.id ?? '',
+    preferredVendorId: item?.preferredVendor?.id ?? '',
     trackInventory: item?.trackInventory ?? false,
     openingStock: '',
     reorderLevel: item?.reorderLevel ?? '',
@@ -130,6 +132,20 @@ export function ItemForm({ item }: { item?: ItemDto }) {
             </Field>
             <Field label="Purchase description" htmlFor="purchaseDescription" error={errors.purchaseDescription?.message}>
               <Textarea id="purchaseDescription" rows={3} {...form.register('purchaseDescription')} />
+            </Field>
+            <Field label="Preferred vendor" htmlFor="preferredVendorId" error={errors.preferredVendorId?.message}>
+              <Controller
+                control={form.control}
+                name="preferredVendorId"
+                render={({ field }) => (
+                  <VendorCombobox
+                    id="preferredVendorId"
+                    value={field.value}
+                    onChange={field.onChange}
+                    invalid={Boolean(errors.preferredVendorId)}
+                  />
+                )}
+              />
             </Field>
           </FormSection>
         </div>
