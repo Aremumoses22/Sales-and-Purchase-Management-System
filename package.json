@@ -1,0 +1,18 @@
+{
+  "name": "sales-and-purchase-management-system",
+  "private": true,
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @spms/shared build && pnpm --parallel --filter @spms/shared --filter @spms/api --filter @spms/web dev",
+    "build": "pnpm --filter @spms/shared build && pnpm --filter @spms/api build && pnpm --filter @spms/web build",
+    "test": "pnpm --filter @spms/shared build && pnpm -r test",
+    "test:e2e": "pnpm --filter @spms/api test:e2e",
+    "typecheck": "pnpm --filter @spms/shared build && pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "db:migrate": "pnpm --filter @spms/api db:migrate",
+    "db:seed": "pnpm --filter @spms/api db:seed"
+  }
+}

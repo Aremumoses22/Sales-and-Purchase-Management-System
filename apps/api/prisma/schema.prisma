@@ -1,0 +1,403 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────── System ───────────────────────────────
+
+model User {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  name               String
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  isActive           Boolean   @default(true) @map("is_active")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  lastLoginAt        DateTime? @map("last_login_at")
+  roleId             String    @map("role_id") @db.Uuid
+  role               Role      @relation(fields: [roleId], references: [id])
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  refreshTokens          RefreshToken[]
+  auditLogs              AuditLog[]
+  contactsCreated        Contact[]       @relation("ContactCreatedBy")
+  itemsCreated           Item[]          @relation("ItemCreatedBy")
+  stockMovementsCreated  StockMovement[] @relation("StockMovementCreatedBy")
+  quotesCreated          Quote[]         @relation("QuoteCreatedBy")
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  permissions String[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("roles")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  /// Every token issued by rotating the same login shares a family; reuse of an old token revokes the family.
+  familyId  String    @map("family_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  userAgent String?   @map("user_agent")
+  ipAddress String?   @map("ip_address")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  summary    String
+  changes    Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// Single row (id = 1): this system manages one organization.
+model Organization {
+  id                   Int      @id @default(1)
+  name                 String
+  email                String?
+  phone                String?
+  website              String?
+  taxNumber            String?  @map("tax_number")
+  addressLine1         String?  @map("address_line1")
+  addressLine2         String?  @map("address_line2")
+  city                 String?
+  state                String?
+  postalCode           String?  @map("postal_code")
+  country              String?
+  currencyCode         String   @default("USD") @map("currency_code")
+  currencySymbol       String   @default("$") @map("currency_symbol")
+  dateFormat           String   @default("dd MMM yyyy") @map("date_format")
+  fiscalYearStartMonth Int      @default(1) @map("fiscal_year_start_month")
+  timezone             String   @default("UTC")
+  logoFile             String?  @map("logo_file")
+  logoMimeType         String?  @map("logo_mime_type")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("organization")
+}
+
+enum DocumentType {
+  quote
+  invoice
+  sales_receipt
+  payment_received
+  credit_note
+  payment_made
+}
+
+model NumberSeries {
+  documentType DocumentType @id @map("document_type")
+  prefix       String
+  nextNumber   Int          @map("next_number")
+  padding      Int
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  @@map("number_series")
+}
+
+model PaymentTerm {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String   @unique
+  days      Int
+  isDefault Boolean  @default(false) @map("is_default")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contacts Contact[]
+
+  @@map("payment_terms")
+}
+
+model Tax {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String   @unique
+  rate      Decimal  @db.Decimal(6, 3)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items      Item[]
+  quoteLines QuoteLine[]
+
+  @@map("taxes")
+}
+
+model PaymentMode {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String   @unique
+  isDefault Boolean  @default(false) @map("is_default")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("payment_modes")
+}
+
+model ExpenseCategory {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("expense_categories")
+}
+
+// ─────────────────────────────── Contacts ───────────────────────────────
+
+enum ContactType {
+  customer
+  vendor
+}
+
+enum ContactKind {
+  business
+  individual
+}
+
+enum AddressKind {
+  billing
+  shipping
+}
+
+model Contact {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  type           ContactType
+  kind           ContactKind  @default(business)
+  salutation     String?
+  firstName      String?      @map("first_name")
+  lastName       String?      @map("last_name")
+  companyName    String?      @map("company_name")
+  displayName    String       @map("display_name")
+  email          String?
+  workPhone      String?      @map("work_phone")
+  mobile         String?
+  website        String?
+  taxNumber      String?      @map("tax_number")
+  paymentTermId  String?      @map("payment_term_id") @db.Uuid
+  paymentTerm    PaymentTerm? @relation(fields: [paymentTermId], references: [id], onDelete: SetNull)
+  openingBalance Decimal      @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  notes          String?
+  isActive       Boolean      @default(true) @map("is_active")
+  createdById    String?      @map("created_by_id") @db.Uuid
+  createdBy      User?        @relation("ContactCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  addresses         ContactAddress[]
+  contactPersons    ContactPerson[]
+  quotes            Quote[]
+  preferredForItems Item[]           @relation("ItemPreferredVendor")
+
+  @@index([type, isActive, displayName])
+  @@map("contacts")
+}
+
+model ContactAddress {
+  id         String      @id @default(uuid(7)) @db.Uuid
+  contactId  String      @map("contact_id") @db.Uuid
+  contact    Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  kind       AddressKind
+  attention  String?
+  line1      String?
+  line2      String?
+  city       String?
+  state      String?
+  postalCode String?     @map("postal_code")
+  country    String?
+  phone      String?
+
+  @@unique([contactId, kind])
+  @@map("contact_addresses")
+}
+
+model ContactPerson {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  contactId   String  @map("contact_id") @db.Uuid
+  contact     Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  position    Int     @default(0)
+  salutation  String?
+  firstName   String  @map("first_name")
+  lastName    String? @map("last_name")
+  email       String?
+  workPhone   String? @map("work_phone")
+  mobile      String?
+  designation String?
+  isPrimary   Boolean @default(false) @map("is_primary")
+
+  @@index([contactId])
+  @@map("contact_persons")
+}
+
+// ─────────────────────────────── Items ───────────────────────────────
+
+enum ItemType {
+  goods
+  service
+}
+
+enum StockMovementType {
+  opening
+  adjustment
+  invoice
+  sales_receipt
+  credit_note
+  bill
+}
+
+model Item {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  type                ItemType
+  name                String
+  sku                 String?  @unique
+  unit                String?
+  sellingPrice        Decimal? @map("selling_price") @db.Decimal(18, 2)
+  salesDescription    String?  @map("sales_description")
+  costPrice           Decimal? @map("cost_price") @db.Decimal(18, 2)
+  purchaseDescription String?  @map("purchase_description")
+  taxId               String?  @map("tax_id") @db.Uuid
+  tax                 Tax?     @relation(fields: [taxId], references: [id], onDelete: SetNull)
+  /// Set from Module 10 (Vendors) onwards.
+  preferredVendorId   String?  @map("preferred_vendor_id") @db.Uuid
+  preferredVendor     Contact? @relation("ItemPreferredVendor", fields: [preferredVendorId], references: [id], onDelete: SetNull)
+  trackInventory      Boolean  @default(false) @map("track_inventory")
+  reorderLevel        Decimal? @map("reorder_level") @db.Decimal(18, 3)
+  isActive            Boolean  @default(true) @map("is_active")
+  createdById         String?  @map("created_by_id") @db.Uuid
+  createdBy           User?    @relation("ItemCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  stockMovements StockMovement[]
+  quoteLines     QuoteLine[]
+
+  @@index([isActive, name])
+  @@map("items")
+}
+
+model StockMovement {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  itemId      String            @map("item_id") @db.Uuid
+  item        Item              @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  date        DateTime          @db.Date
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(18, 3)
+  reason      String?
+  sourceType  String?           @map("source_type")
+  sourceId    String?           @map("source_id") @db.Uuid
+  createdById String?           @map("created_by_id") @db.Uuid
+  createdBy   User?             @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  @@index([itemId, date])
+  @@index([sourceType, sourceId])
+  @@map("stock_movements")
+}
+
+// ─────────────────────────────── Sales: Quotes ───────────────────────────────
+
+enum QuoteStatus {
+  draft
+  sent
+  accepted
+  declined
+  invoiced
+}
+
+enum DiscountType {
+  percent
+  amount
+}
+
+model Quote {
+  id              String      @id @default(uuid(7)) @db.Uuid
+  number          String      @unique
+  customerId      String      @map("customer_id") @db.Uuid
+  customer        Contact     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  quoteDate       DateTime    @map("quote_date") @db.Date
+  expiryDate      DateTime?   @map("expiry_date") @db.Date
+  referenceNumber String?     @map("reference_number")
+  subject         String?
+  status          QuoteStatus @default(draft)
+  subtotal        Decimal     @db.Decimal(18, 2)
+  discountTotal   Decimal     @map("discount_total") @db.Decimal(18, 2)
+  taxTotal        Decimal     @map("tax_total") @db.Decimal(18, 2)
+  shippingCharge  Decimal     @default(0) @map("shipping_charge") @db.Decimal(18, 2)
+  adjustment      Decimal     @default(0) @db.Decimal(18, 2)
+  total           Decimal     @db.Decimal(18, 2)
+  customerNotes   String?     @map("customer_notes")
+  terms           String?
+  sentAt          DateTime?   @map("sent_at")
+  acceptedAt      DateTime?   @map("accepted_at")
+  declinedAt      DateTime?   @map("declined_at")
+  createdById     String?     @map("created_by_id") @db.Uuid
+  createdBy       User?       @relation("QuoteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  lines QuoteLine[]
+
+  @@index([customerId])
+  @@index([status, quoteDate])
+  @@index([quoteDate])
+  @@map("quotes")
+}
+
+model QuoteLine {
+  id            String       @id @default(uuid(7)) @db.Uuid
+  quoteId       String       @map("quote_id") @db.Uuid
+  quote         Quote        @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  position      Int
+  itemId        String?      @map("item_id") @db.Uuid
+  item          Item?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  name          String
+  description   String?
+  quantity      Decimal      @db.Decimal(18, 3)
+  unit          String?
+  rate          Decimal      @db.Decimal(18, 2)
+  discountType  DiscountType @default(percent) @map("discount_type")
+  discountValue Decimal      @default(0) @map("discount_value") @db.Decimal(18, 2)
+  taxId         String?      @map("tax_id") @db.Uuid
+  tax           Tax?         @relation(fields: [taxId], references: [id], onDelete: SetNull)
+  taxName       String?      @map("tax_name")
+  taxRate       Decimal?     @map("tax_rate") @db.Decimal(6, 3)
+  amount        Decimal      @db.Decimal(18, 2)
+  taxAmount     Decimal      @map("tax_amount") @db.Decimal(18, 2)
+
+  @@index([quoteId])
+  @@index([itemId])
+  @@map("quote_lines")
+}
