@@ -1,0 +1,65 @@
+# Sales & Purchase Management System
+
+A web app for managing customers, items, quotes, invoices, payments, vendors and expenses, modelled on Zoho Books. It is built module by module following [PLAN.md](PLAN.md); the scope is in [scope.md](scope.md).
+
+## Status
+
+| Module | What it covers | State |
+|---|---|---|
+| 0 Foundation | Workspace, shared money/totals engine, API conventions, app shell | Done |
+| 1 Access and settings | Sign-in, users, roles and permissions, organization profile, numbering, taxes, payment terms and modes, expense categories, audit log | Done |
+| 2 Customers | Customers with addresses and contact people, search, history | Done |
+| 3 Items | Goods and services, prices and taxes, stock tracking and adjustments | Done |
+| 4 Quotes | Quote editor with live totals, status workflow, split view, print/PDF | Done (converting to an invoice arrives with Module 5) |
+| 5–14 | Invoices, payments, credit notes, receipts, recurring invoices, vendors, expenses, bills, dashboard, reports | Planned |
+
+## Stack
+
+Next.js 16 (App Router) · NestJS 12 · PostgreSQL · Prisma 7 · TypeScript · Zod · TanStack Query and Table · shadcn/ui on Tailwind CSS 4
+
+```text
+apps/api          NestJS REST API (http://localhost:4000/api/v1, docs at /api/docs)
+apps/web          Next.js app (http://localhost:3000); forwards /api/* to the API
+packages/shared   Zod schemas, DTO types, permissions and the document totals calculator
+```
+
+## Requirements
+
+- Node.js 22.12 or newer
+- pnpm 12: `npm install -g pnpm`
+- PostgreSQL 16 or newer
+
+## First-time setup
+
+```bash
+pnpm install
+
+createdb spms          # development data
+createdb spms_test     # emptied on every end-to-end test run
+
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local
+# In apps/api/.env set DATABASE_URL, TEST_DATABASE_URL and JWT_SECRET (openssl rand -hex 48)
+
+pnpm --filter @spms/shared build
+pnpm db:migrate
+pnpm db:seed
+```
+
+The seed creates the roles (Admin, Accountant, Sales, Viewer), default payment terms, payment modes, expense categories, numbering, and one admin user from `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (defaults: `admin@example.com` / `Admin12345`). Change that password under **Settings → My profile**. Taxes are not seeded; add your rates under **Settings → Taxes**.
+
+## Running
+
+```bash
+pnpm dev
+```
+
+This builds the shared package, then runs it in watch mode alongside the API and the web app. Open http://localhost:3000.
+
+## Tests
+
+```bash
+pnpm test        # shared package and API unit tests
+pnpm test:e2e    # API end-to-end tests against spms_test
+pnpm typecheck
+```
