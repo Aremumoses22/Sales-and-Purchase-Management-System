@@ -8,20 +8,17 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DocumentListPane } from '@/components/documents/document-list-pane';
+import { RefundDialog } from '@/components/documents/refund-dialog';
 import { EmptyState } from '@/components/empty-state';
-import { Field } from '@/components/field';
 import { HistoryPanel } from '@/components/history-panel';
 import { Money } from '@/components/money';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
 import {
   useAddRefund,
   useDeletePayment,
@@ -31,72 +28,9 @@ import {
   useRemoveRefund,
 } from '@/features/payments/api';
 import { PaymentReceipt } from '@/features/payments/payment-receipt';
-import { useLookupQuery } from '@/features/settings/api';
-import { ApiError } from '@/lib/api';
-import { formatDate, todayForInput } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { showApiError } from '@/lib/forms';
 import { useCan, useOrganization } from '@/lib/session';
-
-function RefundDialog({ paymentId, unused, onClose }: { paymentId: string; unused: string; onClose: () => void }) {
-  const refund = useAddRefund();
-  const { data: modes } = useLookupQuery('payment-modes');
-  const [values, setValues] = useState({ refundDate: todayForInput(), amount: unused, paymentModeId: '', referenceNumber: '', notes: '' });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const submit = async () => {
-    setErrors({});
-    try {
-      await refund.mutateAsync({ id: paymentId, input: values });
-      toast.success('Refund recorded');
-      onClose();
-    } catch (error) {
-      if (error instanceof ApiError && error.fieldErrors.length) {
-        setErrors(Object.fromEntries(error.fieldErrors.map((issue) => [issue.path, issue.message])));
-      } else showApiError(error);
-    }
-  };
-
-  return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Refund unused amount</DialogTitle>
-          <DialogDescription>Record money returned to the customer from this payment.</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Refund date" htmlFor="refundDate" error={errors['refundDate']}>
-            <Input id="refundDate" type="date" value={values.refundDate} onChange={(e) => setValues({ ...values, refundDate: e.target.value })} />
-          </Field>
-          <Field label="Amount" htmlFor="refundAmount" error={errors['amount']}>
-            <Input id="refundAmount" inputMode="decimal" className="text-right" value={values.amount} onChange={(e) => setValues({ ...values, amount: e.target.value })} />
-          </Field>
-          <Field label="Paid through" htmlFor="refundMode" error={errors['paymentModeId']}>
-            <NativeSelect id="refundMode" value={values.paymentModeId} onChange={(e) => setValues({ ...values, paymentModeId: e.target.value })}>
-              <option value="">Not specified</option>
-              {modes?.map((mode) => (
-                <option key={mode.id} value={mode.id}>
-                  {mode.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Reference#" htmlFor="refundReference" error={errors['referenceNumber']}>
-            <Input id="refundReference" value={values.referenceNumber} onChange={(e) => setValues({ ...values, referenceNumber: e.target.value })} />
-          </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={refund.isPending}>
-            Cancel
-          </Button>
-          <Button onClick={submit} disabled={refund.isPending}>
-            {refund.isPending ? <Loader2Icon className="animate-spin" /> : null}
-            Save refund
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export default function PaymentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -107,6 +41,7 @@ export default function PaymentDetailPage() {
   const list = usePayments({ pageSize: 50, sort: '-date' });
   const history = usePaymentHistory(id);
   const remove = useDeletePayment();
+  const addRefund = useAddRefund();
   const removeRefund = useRemoveRefund();
   const [refunding, setRefunding] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -254,7 +189,16 @@ export default function PaymentDetailPage() {
         )}
       </section>
 
-      {refunding && payment ? <RefundDialog paymentId={id} unused={payment.unusedAmount} onClose={() => setRefunding(false)} /> : null}
+      {refunding && payment ? (
+        <RefundDialog
+          title="Refund unused amount"
+          description="Record money returned to the customer from this payment."
+          defaultAmount={payment.unusedAmount}
+          busy={addRefund.isPending}
+          onSubmit={(input) => addRefund.mutateAsync({ id, input })}
+          onClose={() => setRefunding(false)}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={confirmDelete}

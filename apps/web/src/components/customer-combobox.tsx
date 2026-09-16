@@ -16,11 +16,13 @@ export function CustomerCombobox({
   value,
   onChange,
   invalid,
+  disabled,
 }: {
   id?: string;
   value: string | null | undefined;
   onChange: (customerId: string) => void;
   invalid?: boolean;
+  disabled?: boolean;
 }) {
   const can = useCan();
   const [open, setOpen] = useState(false);
@@ -36,8 +38,9 @@ export function CustomerCombobox({
           <button
             id={id}
             type="button"
+            disabled={disabled}
             className={cn(
-              'flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-2.5 text-left text-sm outline-none',
+              'flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-2.5 text-left text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60',
               'focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
               invalid && 'border-destructive ring-3 ring-destructive/20',
             )}

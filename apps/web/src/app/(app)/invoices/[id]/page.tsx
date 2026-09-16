@@ -6,7 +6,6 @@ import {
   moneyString,
   todayInTimeZone,
   toDecimal,
-  type AvailableCreditsDto,
   type InvoiceDto,
 } from '@spms/shared';
 import {
@@ -18,6 +17,7 @@ import {
   PencilIcon,
   PrinterIcon,
   SendIcon,
+  WalletIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -97,23 +97,26 @@ function VoidDialog({ invoiceNumber, busy, onClose, onConfirm }: {
   );
 }
 
+type CreditSource = { kind: 'payment' | 'creditNote'; id: string; number: string; date: string; available: string };
+
 function ApplyCreditsDialog({
   invoice,
-  credits,
+  sources,
   onClose,
 }: {
   invoice: InvoiceDto;
-  credits: AvailableCreditsDto;
+  sources: CreditSource[];
   onClose: () => void;
 }) {
+  const organization = useOrganization();
   const apply = useApplyCredits();
   const [amounts, setAmounts] = useState<Record<string, string>>(() => {
     // Suggest using the oldest credit first, up to what is due.
     let remaining = toDecimal(invoice.balanceDue);
     const initial: Record<string, string> = {};
-    for (const payment of credits.payments) {
-      const share = remaining.lt(payment.unusedAmount) ? remaining : toDecimal(payment.unusedAmount);
-      initial[payment.id] = share.gt(0) ? moneyString(share) : '';
+    for (const source of sources) {
+      const share = remaining.lt(source.available) ? remaining : toDecimal(source.available);
+      initial[source.id] = share.gt(0) ? moneyString(share) : '';
       remaining = remaining.minus(share);
     }
     return initial;
@@ -121,25 +124,33 @@ function ApplyCreditsDialog({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string>();
 
-  const entries = credits.payments
-    .map((payment) => ({ paymentId: payment.id, amount: (amounts[payment.id] ?? '').trim() }))
+  const chosen = sources
+    .map((source) => ({ source, amount: (amounts[source.id] ?? '').trim() }))
     .filter((entry) => Number(entry.amount) > 0);
-  const total = entries.reduce((sum, entry) => sum.plus(toDecimal(entry.amount)), toDecimal(0));
+  const payments = chosen.filter((entry) => entry.source.kind === 'payment');
+  const creditNotes = chosen.filter((entry) => entry.source.kind === 'creditNote');
+  const total = chosen.reduce((sum, entry) => sum.plus(toDecimal(entry.amount)), toDecimal(0));
 
   const submit = async () => {
     setErrors({});
     setFormError(undefined);
     try {
-      await apply.mutateAsync({ invoiceId: invoice.id, input: { payments: entries } });
+      await apply.mutateAsync({
+        invoiceId: invoice.id,
+        input: {
+          payments: payments.map((entry) => ({ paymentId: entry.source.id, amount: entry.amount })),
+          creditNotes: creditNotes.map((entry) => ({ creditNoteId: entry.source.id, amount: entry.amount })),
+        },
+      });
       toast.success('Credits applied');
       onClose();
     } catch (error) {
       if (!(error instanceof ApiError)) return showApiError(error);
       const next: Record<string, string> = {};
       for (const issue of error.fieldErrors) {
-        const match = /^payments\.(\d+)\./.exec(issue.path);
-        const entry = match ? entries[Number(match[1])] : undefined;
-        if (entry) next[entry.paymentId] = issue.message;
+        const match = /^(payments|creditNotes)\.(\d+)\./.exec(issue.path);
+        const entry = match ? (match[1] === 'payments' ? payments : creditNotes)[Number(match[2])] : undefined;
+        if (entry) next[entry.source.id] = issue.message;
         else setFormError(issue.message);
       }
       setErrors(next);
@@ -159,27 +170,32 @@ function ApplyCreditsDialog({
         <table className="w-full text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr>
-              <th className="py-1.5 text-left font-medium">Payment</th>
-              <th className="py-1.5 text-right font-medium">Unused</th>
+              <th className="py-1.5 text-left font-medium">Credit</th>
+              <th className="py-1.5 text-right font-medium">Available</th>
               <th className="w-36 py-1.5 text-right font-medium">Apply</th>
             </tr>
           </thead>
           <tbody>
-            {credits.payments.map((payment) => (
-              <tr key={payment.id} className="border-t align-top">
-                <td className="py-2">{payment.number}</td>
+            {sources.map((source) => (
+              <tr key={source.id} className="border-t align-top">
+                <td className="py-2">
+                  {source.number}
+                  <span className="block text-xs text-muted-foreground">
+                    {source.kind === 'payment' ? 'Unused payment' : 'Credit note'} · {formatDate(source.date, organization)}
+                  </span>
+                </td>
                 <td className="py-2 text-right">
-                  <Money value={payment.unusedAmount} />
+                  <Money value={source.available} />
                 </td>
                 <td className="py-1.5">
                   <Input
                     inputMode="decimal"
-                    aria-label={`Amount to apply from ${payment.number}`}
+                    aria-label={`Amount to apply from ${source.number}`}
                     className="text-right"
-                    value={amounts[payment.id] ?? ''}
-                    onChange={(event) => setAmounts({ ...amounts, [payment.id]: event.target.value })}
+                    value={amounts[source.id] ?? ''}
+                    onChange={(event) => setAmounts({ ...amounts, [source.id]: event.target.value })}
                   />
-                  {errors[payment.id] ? <p className="mt-1 text-right text-xs text-destructive">{errors[payment.id]}</p> : null}
+                  {errors[source.id] ? <p className="mt-1 text-right text-xs text-destructive">{errors[source.id]}</p> : null}
                 </td>
               </tr>
             ))}
@@ -193,7 +209,7 @@ function ApplyCreditsDialog({
           <Button variant="outline" onClick={onClose} disabled={apply.isPending}>
             Cancel
           </Button>
-          <Button onClick={submit} disabled={apply.isPending || entries.length === 0}>
+          <Button onClick={submit} disabled={apply.isPending || chosen.length === 0}>
             {apply.isPending ? <Loader2Icon className="animate-spin" /> : null}
             Apply credits
           </Button>
@@ -203,25 +219,51 @@ function ApplyCreditsDialog({
   );
 }
 
-/** Zoho's "Credits available" bar: unused money this customer has already paid. */
+/** Zoho's "Credits available" bar: unused payments and open credit notes of this customer. */
 function AvailableCredits({ invoice }: { invoice: InvoiceDto }) {
   const can = useCan();
-  const eligible = can('payments_received:edit') && invoice.status !== 'void' && toDecimal(invoice.balanceDue).gt(0);
+  const canUsePayments = can('payments_received:edit');
+  const canUseCreditNotes = can('credit_notes:edit');
+  const eligible = (canUsePayments || canUseCreditNotes) && invoice.status !== 'void' && toDecimal(invoice.balanceDue).gt(0);
   const { data } = useAvailableCredits(invoice.id, eligible);
   const [open, setOpen] = useState(false);
 
-  if (!eligible || !data || !toDecimal(data.total).gt(0)) return null;
+  if (!eligible || !data) return null;
+  // Oldest first, across both kinds, limited to what this user may apply.
+  const sources: CreditSource[] = [
+    ...(canUsePayments
+      ? data.payments.map((payment) => ({
+          kind: 'payment' as const,
+          id: payment.id,
+          number: payment.number,
+          date: payment.paymentDate,
+          available: payment.unusedAmount,
+        }))
+      : []),
+    ...(canUseCreditNotes
+      ? data.creditNotes.map((creditNote) => ({
+          kind: 'creditNote' as const,
+          id: creditNote.id,
+          number: creditNote.number,
+          date: creditNote.creditNoteDate,
+          available: creditNote.balance,
+        }))
+      : []),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number));
+  const total = sources.reduce((sum, source) => sum.plus(toDecimal(source.available)), toDecimal(0));
+  if (!total.gt(0)) return null;
+
   return (
     <>
       <div className="mx-auto flex max-w-[210mm] flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-900 ring-1 ring-emerald-600/20">
         <span>
-          Credits available: <Money value={data.total} className="font-semibold" />
+          Credits available: <Money value={total.toFixed(2)} className="font-semibold" />
         </span>
         <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
           Apply credits
         </Button>
       </div>
-      {open ? <ApplyCreditsDialog invoice={invoice} credits={data} onClose={() => setOpen(false)} /> : null}
+      {open ? <ApplyCreditsDialog invoice={invoice} sources={sources} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -358,6 +400,12 @@ export default function InvoiceDetailPage() {
                         Clone
                       </DropdownMenuItem>
                     ) : null}
+                    {can('credit_notes:create') && invoice.status === 'sent' ? (
+                      <DropdownMenuItem render={<Link href={`/credit-notes/new?invoiceId=${id}`} />}>
+                        <WalletIcon />
+                        Create credit note
+                      </DropdownMenuItem>
+                    ) : null}
                     {can('invoices:void') && canPerformInvoiceAction('void', invoice) ? (
                       <DropdownMenuItem onClick={() => setVoiding(true)}>Void</DropdownMenuItem>
                     ) : null}
@@ -424,6 +472,36 @@ export default function InvoiceDetailPage() {
                           <td className="py-2 text-muted-foreground">{payment.paymentMode ?? '—'}</td>
                           <td className="py-2 text-right">
                             <Money value={payment.amount} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+
+              {invoice.credits.length > 0 ? (
+                <div className="mx-auto max-w-[210mm] rounded-xl border bg-card p-5">
+                  <h2 className="mb-3 text-sm font-semibold">Credits applied</h2>
+                  <table className="w-full text-sm">
+                    <thead className="text-xs text-muted-foreground">
+                      <tr>
+                        <th className="py-1.5 text-left font-medium">Date</th>
+                        <th className="py-1.5 text-left font-medium">Credit note#</th>
+                        <th className="py-1.5 text-right font-medium">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoice.credits.map((credit) => (
+                        <tr key={credit.applicationId} className="border-t">
+                          <td className="py-2">{formatDate(credit.appliedDate, organization)}</td>
+                          <td className="py-2">
+                            <Link href={`/credit-notes/${credit.creditNoteId}`} className="font-medium text-primary hover:underline">
+                              {credit.number}
+                            </Link>
+                          </td>
+                          <td className="py-2 text-right">
+                            <Money value={credit.amount} />
                           </td>
                         </tr>
                       ))}

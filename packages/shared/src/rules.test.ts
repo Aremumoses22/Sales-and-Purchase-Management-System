@@ -5,8 +5,16 @@ import { ALL_PERMISSIONS, DEFAULT_ROLES, isPermission } from './permissions.js';
 import { contactSchema } from './schemas/contacts.js';
 import { documentLineSchema, invoiceSchema, quoteSchema } from './schemas/documents.js';
 import { itemSchema } from './schemas/items.js';
+import { applyCreditNoteSchema } from './schemas/credit-notes.js';
 import { paymentReceivedSchema } from './schemas/payments.js';
-import { canPerformInvoiceAction, canPerformQuoteAction, getInvoiceDisplayStatus, getQuoteDisplayStatus } from './statuses.js';
+import {
+  canPerformCreditNoteAction,
+  canPerformInvoiceAction,
+  canPerformQuoteAction,
+  getCreditNoteDisplayStatus,
+  getInvoiceDisplayStatus,
+  getQuoteDisplayStatus,
+} from './statuses.js';
 
 describe('quote status rules', () => {
   it('shows a sent quote past its expiry date as expired', () => {
@@ -193,5 +201,40 @@ describe('payment schemas', () => {
       }).success,
     ).toBe(false);
     expect(paymentReceivedSchema.safeParse({ ...base, amount: '0' }).success).toBe(false);
+  });
+});
+
+describe('credit note rules', () => {
+  const open = { status: 'open', amountApplied: '0', amountRefunded: '0', balance: '100' } as const;
+
+  it('shows an open credit note with nothing left as closed', () => {
+    expect(getCreditNoteDisplayStatus(open)).toBe('open');
+    expect(getCreditNoteDisplayStatus({ ...open, balance: '0' })).toBe('closed');
+    expect(getCreditNoteDisplayStatus({ ...open, status: 'draft' })).toBe('draft');
+    expect(getCreditNoteDisplayStatus({ ...open, status: 'void', balance: '0' })).toBe('void');
+  });
+
+  it('applies and refunds only open credit with a balance, and voids only unused credit', () => {
+    expect(canPerformCreditNoteAction('apply', open)).toBe(true);
+    expect(canPerformCreditNoteAction('apply', { ...open, status: 'draft' })).toBe(false);
+    expect(canPerformCreditNoteAction('refund', { ...open, amountApplied: '100', balance: '0' })).toBe(false);
+    expect(canPerformCreditNoteAction('void', open)).toBe(true);
+    expect(canPerformCreditNoteAction('void', { ...open, amountRefunded: '10', balance: '90' })).toBe(false);
+    expect(canPerformCreditNoteAction('delete', open)).toBe(false);
+    expect(canPerformCreditNoteAction('delete', { ...open, status: 'draft' })).toBe(true);
+    expect(canPerformCreditNoteAction('edit', { ...open, status: 'void' })).toBe(false);
+  });
+
+  it('refuses to apply a credit note to the same invoice twice', () => {
+    const invoiceId = '0199b5a0-0000-7000-8000-00000000000a';
+    expect(
+      applyCreditNoteSchema.safeParse({
+        applications: [
+          { invoiceId, amount: '10' },
+          { invoiceId, amount: '20' },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(applyCreditNoteSchema.safeParse({ applications: [] }).success).toBe(false);
   });
 });

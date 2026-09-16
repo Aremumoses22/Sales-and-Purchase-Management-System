@@ -8,6 +8,7 @@ import { DocumentsModule } from './modules/documents/documents.module.js';
 import { HealthController } from './modules/health/health.controller.js';
 import { InvoicesModule } from './modules/invoices/invoices.module.js';
 import { ItemsModule } from './modules/items/items.module.js';
+import { CreditNotesModule } from './modules/credit-notes/credit-notes.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { QuotesModule } from './modules/quotes/quotes.module.js';
 import { SearchController } from './modules/search/search.controller.js';
@@ -28,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     QuotesModule,
     InvoicesModule,
     PaymentsModule,
+    CreditNotesModule,
   ],
   controllers: [HealthController, SearchController],
   providers: [

@@ -7,12 +7,14 @@ import {
   paymentReceivedSchema,
   paymentRefundSchema,
   type ApplyCreditsOutput,
+  type AuthUserDto,
   type OpenInvoicesQuery,
   type PaymentListQuery,
   type PaymentReceivedOutput,
   type PaymentRefundOutput,
 } from '@spms/shared';
-import { RequirePermissions } from '../../common/decorators.js';
+import { AppException } from '../../common/app-exception.js';
+import { CurrentUser, RequirePermissions } from '../../common/decorators.js';
 import { ApiZodBody } from '../../common/swagger.js';
 import { uuidParam } from '../../common/validation.js';
 import { PaymentsService } from './payments.service.js';
@@ -97,11 +99,20 @@ export class InvoiceCreditsController {
     return this.payments.availableCredits(id);
   }
 
+  /** Needs payments_received:edit to use payments and credit_notes:edit to use credit notes. */
   @Post(':id/apply-credits')
-  @RequirePermissions('payments_received:edit')
+  @RequirePermissions('invoices:view')
   @HttpCode(HttpStatus.OK)
   @ApiZodBody(applyCreditsSchema)
-  applyCredits(@Param('id', { schema: uuidParam }) id: string, @Body({ schema: applyCreditsSchema }) body: ApplyCreditsOutput) {
+  applyCredits(
+    @Param('id', { schema: uuidParam }) id: string,
+    @Body({ schema: applyCreditsSchema }) body: ApplyCreditsOutput,
+    @CurrentUser() user: AuthUserDto,
+  ) {
+    const missing =
+      (body.payments.length > 0 && !user.permissions.includes('payments_received:edit')) ||
+      (body.creditNotes.length > 0 && !user.permissions.includes('credit_notes:edit'));
+    if (missing) throw new AppException('FORBIDDEN', 'You do not have permission to apply these credits', HttpStatus.FORBIDDEN);
     return this.payments.applyCredits(id, body);
   }
 }

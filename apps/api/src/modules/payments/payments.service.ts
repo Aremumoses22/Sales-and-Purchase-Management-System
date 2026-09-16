@@ -26,6 +26,7 @@ import { getRequestContext } from '../../common/request-context.js';
 import { fromDateOnly, money, toDateOnly, toIso } from '../../common/serialize.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService, type Tx } from '../../prisma/prisma.service.js';
+import { CreditNotesService } from '../credit-notes/credit-notes.service.js';
 import { toDocumentCustomer } from '../documents/document-lines.service.js';
 import { InvoicesService } from '../invoices/invoices.service.js';
 import { NumberSeriesService } from '../settings/number-series.service.js';
@@ -115,6 +116,7 @@ export class PaymentsService {
     private readonly numberSeries: NumberSeriesService,
     private readonly organization: OrganizationService,
     private readonly invoices: InvoicesService,
+    private readonly creditNotes: CreditNotesService,
   ) {}
 
   async list(query: PaymentListQuery): Promise<Paginated<PaymentReceivedListItemDto>> {
@@ -345,17 +347,23 @@ export class PaymentsService {
     return this.get(id);
   }
 
-  /** Unused money the invoice's customer has already paid, ready to apply to this invoice. */
+  /** Unused payments and open credit notes of the invoice's customer, ready to apply to this invoice. */
   async availableCredits(invoiceId: string): Promise<AvailableCreditsDto> {
     const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId }, select: { customerId: true } });
     if (!invoice) throw notFound('Invoice');
-    const payments = await this.prisma.paymentReceived.findMany({
-      where: { customerId: invoice.customerId },
-      orderBy: [{ paymentDate: 'asc' }, { number: 'asc' }],
-    });
+    const [payments, creditNotes] = await Promise.all([
+      this.prisma.paymentReceived.findMany({
+        where: { customerId: invoice.customerId },
+        orderBy: [{ paymentDate: 'asc' }, { number: 'asc' }],
+      }),
+      this.creditNotes.availableFor(invoice.customerId),
+    ]);
     const available = payments
       .map((payment) => ({ payment, unused: unusedOf(payment) }))
       .filter(({ unused }) => unused.gt(0));
+    const total = available
+      .reduce<Decimal>((sum, { unused }) => sum.plus(unused), toDecimal(0))
+      .plus(creditNotes.reduce<Decimal>((sum, creditNote) => sum.plus(toDecimal(creditNote.balance)), toDecimal(0)));
     return {
       payments: available.map(({ payment, unused }) => ({
         id: payment.id,
@@ -363,17 +371,42 @@ export class PaymentsService {
         paymentDate: toDateOnly(payment.paymentDate),
         unusedAmount: money(unused),
       })),
-      total: money(available.reduce<Decimal>((sum, { unused }) => sum.plus(unused), toDecimal(0))),
+      creditNotes: creditNotes.map((creditNote) => ({
+        id: creditNote.id,
+        number: creditNote.number,
+        creditNoteDate: toDateOnly(creditNote.creditNoteDate),
+        balance: money(creditNote.balance),
+      })),
+      total: money(total),
     };
   }
 
   async applyCredits(invoiceId: string, input: ApplyCreditsOutput): Promise<InvoiceDto> {
-    const requested = input.payments.reduce<Decimal>((sum, entry) => sum.plus(toDecimal(entry.amount)), toDecimal(0));
+    const requested = [...input.payments, ...input.creditNotes].reduce<Decimal>(
+      (sum, entry) => sum.plus(toDecimal(entry.amount)),
+      toDecimal(0),
+    );
+    const appliedDate = fromDateOnly(todayInTimeZone(await this.organization.timezone()));
 
     await this.prisma.$transaction(async (tx) => {
-      // Lock payments before the invoice, the same order payment edits use.
+      // Lock payments and credit notes before the invoice, the same order payment edits use.
       const ordered = input.payments.map((entry, index) => ({ ...entry, index })).sort((a, b) => a.paymentId.localeCompare(b.paymentId));
       for (const entry of ordered) await this.lockPayment(tx, entry.paymentId);
+      const orderedCredits = input.creditNotes
+        .map((entry, index) => ({ ...entry, index }))
+        .sort((a, b) => a.creditNoteId.localeCompare(b.creditNoteId));
+      const lockedCredits = [];
+      for (const entry of orderedCredits) {
+        const creditNote = await this.creditNotes.lockForApplication(tx, entry.creditNoteId, `creditNotes.${entry.index}.creditNoteId`);
+        if (toDecimal(entry.amount).gt(toDecimal(creditNote.balance))) {
+          throw fieldError(
+            'EXCEEDS_BALANCE',
+            `creditNotes.${entry.index}.amount`,
+            `Only ${money(creditNote.balance)} is left on credit note ${creditNote.number}`,
+          );
+        }
+        lockedCredits.push({ entry, creditNote });
+      }
 
       const invoice = await this.invoices.lockForPayment(tx, invoiceId);
       if (!invoice) throw notFound('Invoice');
@@ -415,16 +448,24 @@ export class PaymentsService {
         );
       }
 
+      for (const { entry, creditNote } of lockedCredits) {
+        await this.creditNotes.addApplication(tx, creditNote, invoice, entry.amount, `creditNotes.${entry.index}`, appliedDate);
+      }
+
       await this.invoices.refreshBalances(tx, [invoiceId]);
-      await this.audit.record(
-        {
-          action: 'credits_applied',
-          entityType: 'invoice',
-          entityId: invoiceId,
-          summary: `${money(requested)} of earlier payments applied to invoice ${invoice.number}`,
-        },
-        tx,
-      );
+      for (const { creditNote } of lockedCredits) await this.creditNotes.refresh(tx, creditNote.id);
+      if (ordered.length > 0) {
+        const fromPayments = ordered.reduce<Decimal>((sum, entry) => sum.plus(toDecimal(entry.amount)), toDecimal(0));
+        await this.audit.record(
+          {
+            action: 'credits_applied',
+            entityType: 'invoice',
+            entityId: invoiceId,
+            summary: `${money(fromPayments)} of earlier payments applied to invoice ${invoice.number}`,
+          },
+          tx,
+        );
+      }
     });
     return this.invoices.get(invoiceId);
   }

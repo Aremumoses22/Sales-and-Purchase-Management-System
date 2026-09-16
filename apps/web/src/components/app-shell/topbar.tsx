@@ -99,6 +99,16 @@ function GlobalSearch() {
               ))}
             </CommandGroup>
           ) : null}
+          {data?.creditNotes.length ? (
+            <CommandGroup heading="Credit notes">
+              {data.creditNotes.map((creditNote) => (
+                <CommandItem key={creditNote.id} value={`credit-note-${creditNote.id}`} onSelect={() => go(`/credit-notes/${creditNote.id}`)}>
+                  {creditNote.number}
+                  <span className="text-muted-foreground"> · {creditNote.customerName}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
           {data?.quotes.length ? (
             <CommandGroup heading="Quotes">
               {data.quotes.map((quote) => (
@@ -122,6 +132,7 @@ function QuickCreate() {
     { href: '/invoices/new', label: 'Invoice', permission: 'invoices:create' as const },
     { href: '/quotes/new', label: 'Quote', permission: 'quotes:create' as const },
     { href: '/payments-received/new', label: 'Payment received', permission: 'payments_received:create' as const },
+    { href: '/credit-notes/new', label: 'Credit note', permission: 'credit_notes:create' as const },
     { href: '/customers/new', label: 'Customer', permission: 'customers:create' as const },
     { href: '/items/new', label: 'Item', permission: 'items:create' as const },
   ].filter((action) => can(action.permission));

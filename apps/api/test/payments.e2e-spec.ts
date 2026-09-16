@@ -225,6 +225,7 @@ describe('Payments received (e2e)', () => {
     const credits = (await admin.get(`${API}/invoices/${later.id}/available-credits`).expect(200)).body as AvailableCreditsDto;
     expect(credits).toEqual({
       payments: [{ id: payment.id, number: payment.number, paymentDate: today, unusedAmount: '5000.00' }],
+      creditNotes: [],
       total: '5000.00',
     });
 

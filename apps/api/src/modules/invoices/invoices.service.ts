@@ -59,6 +59,10 @@ const INVOICE_INCLUDE = {
     },
     orderBy: { createdAt: 'asc' },
   },
+  creditApplications: {
+    include: { creditNote: { select: { id: true, number: true } } },
+    orderBy: { createdAt: 'asc' },
+  },
 } satisfies Prisma.InvoiceInclude;
 
 type InvoiceDetail = Prisma.InvoiceGetPayload<{ include: typeof INVOICE_INCLUDE }>;
@@ -123,6 +127,13 @@ function toInvoiceDto(invoice: InvoiceDetail, today: string): InvoiceDto {
       paymentDate: toDateOnly(allocation.payment.paymentDate),
       paymentMode: allocation.payment.paymentMode?.name ?? null,
       amount: money(allocation.amount),
+    })),
+    credits: invoice.creditApplications.map((application) => ({
+      applicationId: application.id,
+      creditNoteId: application.creditNote.id,
+      number: application.creditNote.number,
+      appliedDate: toDateOnly(application.appliedDate),
+      amount: money(application.amount),
     })),
     sentAt: toIsoOrNull(invoice.sentAt),
     voidedAt: toIsoOrNull(invoice.voidedAt),
@@ -461,8 +472,8 @@ export class InvoicesService {
 
   /**
    * Recomputes the amount paid and balance of each invoice from what has been applied to it
-   * (PLAN.md §4.4). Called inside the transaction that changed the payments. A draft invoice
-   * that receives money is marked as sent, which also takes its stock.
+   * (PLAN.md §4.4): payments plus credit notes. Called inside the transaction that changed them.
+   * A draft invoice that receives money or credit is marked as sent, which also takes its stock.
    */
   async refreshBalances(tx: Tx, invoiceIds: string[]): Promise<void> {
     for (const id of [...new Set(invoiceIds)].sort()) {
@@ -470,11 +481,14 @@ export class InvoicesService {
       const invoice = await tx.invoice.findUnique({ where: { id }, include: { lines: true } });
       if (!invoice) continue;
 
-      const { _sum } = await tx.paymentAllocation.aggregate({ where: { invoiceId: id }, _sum: { amount: true } });
-      const paid = toDecimal(_sum.amount);
+      const [payments, credits] = await Promise.all([
+        tx.paymentAllocation.aggregate({ where: { invoiceId: id }, _sum: { amount: true } }),
+        tx.creditApplication.aggregate({ where: { invoiceId: id }, _sum: { amount: true } }),
+      ]);
+      const paid = toDecimal(payments._sum.amount).plus(toDecimal(credits._sum.amount));
       const total = toDecimal(invoice.total);
       if (paid.gt(total)) {
-        throw conflict('OVERPAID', `Payments applied to invoice ${invoice.number} would exceed its total`);
+        throw conflict('OVERPAID', `Payments and credits applied to invoice ${invoice.number} would exceed its total`);
       }
 
       const becomesSent = invoice.status === 'draft' && paid.gt(0);
@@ -493,7 +507,7 @@ export class InvoicesService {
             action: 'status_changed',
             entityType: 'invoice',
             entityId: id,
-            summary: `Invoice ${invoice.number} marked as sent when a payment was recorded`,
+            summary: `Invoice ${invoice.number} marked as sent when a payment or credit was applied`,
             changes: { status: { from: 'draft', to: 'sent' } },
           },
           tx,

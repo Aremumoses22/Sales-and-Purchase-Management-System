@@ -13,6 +13,8 @@ export interface DocumentPreviewProps {
   meta: { label: string; value: ReactNode }[];
   customer: DocumentCustomerDto;
   subject?: string | null;
+  /** Heading above the subject, e.g. "Reason" on credit notes. */
+  subjectLabel?: string;
   lines: DocumentLineDto[];
   totals: {
     subtotal: string;
@@ -24,8 +26,8 @@ export interface DocumentPreviewProps {
   };
   notes?: string | null;
   terms?: string | null;
-  /** Shown under the total on invoices. */
-  payment?: { amountPaid: string; balanceDue: string };
+  /** Shown under the total on invoices and credit notes. */
+  payment?: { amountPaid: string; balanceDue: string; paidLabel?: string; balanceLabel?: string };
   /** Diagonal corner label, e.g. "Paid" or "Overdue". */
   ribbon?: { label: string; tone: RibbonTone };
   banner?: ReactNode;
@@ -49,6 +51,7 @@ export function DocumentPreview({
   meta,
   customer,
   subject,
+  subjectLabel = 'Subject',
   lines,
   totals,
   notes,
@@ -154,7 +157,7 @@ export function DocumentPreview({
 
       {subject ? (
         <section className="mt-6">
-          <p className="text-xs text-neutral-500">Subject</p>
+          <p className="text-xs text-neutral-500">{subjectLabel}</p>
           <p>{subject}</p>
         </section>
       ) : null}
@@ -238,12 +241,12 @@ export function DocumentPreview({
             <>
               {Number(payment.amountPaid) > 0 ? (
                 <div className="flex justify-between px-2 text-neutral-600">
-                  <dt>Payments and credits</dt>
+                  <dt>{payment.paidLabel ?? 'Payments and credits'}</dt>
                   <dd className="tabular-nums">(-) {money(payment.amountPaid)}</dd>
                 </div>
               ) : null}
               <div className="flex justify-between px-2 font-semibold">
-                <dt>Balance Due</dt>
+                <dt>{payment.balanceLabel ?? 'Balance Due'}</dt>
                 <dd className="tabular-nums">{money(payment.balanceDue)}</dd>
               </div>
             </>

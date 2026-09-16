@@ -42,7 +42,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/sales-receipts', label: 'Sales Receipts', icon: ScrollTextIcon, permission: 'sales_receipts:view', soon: true },
       { href: '/recurring-invoices', label: 'Recurring Invoices', icon: RefreshCwIcon, permission: 'recurring_invoices:view', soon: true },
       { href: '/payments-received', label: 'Payments Received', icon: BanknoteArrowDownIcon, permission: 'payments_received:view' },
-      { href: '/credit-notes', label: 'Credit Notes', icon: WalletIcon, permission: 'credit_notes:view', soon: true },
+      { href: '/credit-notes', label: 'Credit Notes', icon: WalletIcon, permission: 'credit_notes:view' },
     ],
   },
   {

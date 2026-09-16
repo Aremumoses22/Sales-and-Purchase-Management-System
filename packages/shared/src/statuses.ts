@@ -103,3 +103,42 @@ export function canPerformInvoiceAction(
       return invoice.status !== 'void' && toDecimal(invoice.balanceDue).gt(0);
   }
 }
+
+// ---------- Credit notes ----------
+
+/** Stored lifecycle. "Closed" is derived: an open credit note whose balance is used up. */
+export const CREDIT_NOTE_STATUSES = ['draft', 'open', 'void'] as const;
+export type CreditNoteStatus = (typeof CREDIT_NOTE_STATUSES)[number];
+
+export const CREDIT_NOTE_DISPLAY_STATUSES = ['draft', 'open', 'closed', 'void'] as const;
+export type CreditNoteDisplayStatus = (typeof CREDIT_NOTE_DISPLAY_STATUSES)[number];
+
+export interface CreditNoteStatusFacts {
+  status: CreditNoteStatus;
+  amountApplied: NumericInput;
+  amountRefunded: NumericInput;
+  balance: NumericInput;
+}
+
+export function getCreditNoteDisplayStatus(creditNote: Pick<CreditNoteStatusFacts, 'status' | 'balance'>): CreditNoteDisplayStatus {
+  if (creditNote.status !== 'open') return creditNote.status;
+  return toDecimal(creditNote.balance).gt(0) ? 'open' : 'closed';
+}
+
+export type CreditNoteAction = 'edit' | 'delete' | 'markOpen' | 'void' | 'apply' | 'refund';
+
+export function canPerformCreditNoteAction(action: CreditNoteAction, creditNote: CreditNoteStatusFacts): boolean {
+  const used = toDecimal(creditNote.amountApplied).plus(toDecimal(creditNote.amountRefunded)).gt(0);
+  switch (action) {
+    case 'edit':
+      return creditNote.status !== 'void';
+    case 'delete':
+    case 'markOpen':
+      return creditNote.status === 'draft';
+    case 'void':
+      return creditNote.status === 'open' && !used;
+    case 'apply':
+    case 'refund':
+      return creditNote.status === 'open' && toDecimal(creditNote.balance).gt(0);
+  }
+}

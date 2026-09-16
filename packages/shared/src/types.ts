@@ -7,7 +7,14 @@ import type {
   StockMovementType,
 } from './constants.js';
 import type { Permission } from './permissions.js';
-import type { InvoiceDisplayStatus, InvoiceStatus, QuoteDisplayStatus, QuoteStatus } from './statuses.js';
+import type {
+  CreditNoteDisplayStatus,
+  CreditNoteStatus,
+  InvoiceDisplayStatus,
+  InvoiceStatus,
+  QuoteDisplayStatus,
+  QuoteStatus,
+} from './statuses.js';
 import type { TaxBreakdownEntry } from './totals.js';
 
 export interface PageMeta {
@@ -315,6 +322,7 @@ export interface SearchResultsDto {
   items: { id: string; name: string; sku: string | null }[];
   quotes: { id: string; number: string; customerName: string }[];
   invoices: { id: string; number: string; customerName: string }[];
+  creditNotes: { id: string; number: string; customerName: string }[];
 }
 
 export interface InvoiceListItemDto {
@@ -347,6 +355,7 @@ export interface InvoiceDto extends Omit<InvoiceListItemDto, 'customer'> {
   /** The quote this invoice was converted from. */
   quote: { id: string; number: string } | null;
   payments: InvoicePaymentDto[];
+  credits: InvoiceCreditDto[];
   sentAt: string | null;
   voidedAt: string | null;
   voidReason: string | null;
@@ -423,5 +432,62 @@ export interface OpenInvoiceDto {
 
 export interface AvailableCreditsDto {
   payments: { id: string; number: string; paymentDate: string; unusedAmount: string }[];
+  creditNotes: { id: string; number: string; creditNoteDate: string; balance: string }[];
   total: string;
+}
+
+// ---------- Credit notes ----------
+
+/** A credit note applied to an invoice, as shown on the invoice. */
+export interface InvoiceCreditDto {
+  applicationId: string;
+  creditNoteId: string;
+  number: string;
+  appliedDate: string;
+  amount: string;
+}
+
+export interface CreditNoteListItemDto {
+  id: string;
+  number: string;
+  creditNoteDate: string;
+  referenceNumber: string | null;
+  status: CreditNoteStatus;
+  displayStatus: CreditNoteDisplayStatus;
+  total: string;
+  balance: string;
+  customer: { id: string; displayName: string };
+  invoice: { id: string; number: string } | null;
+}
+
+export interface CreditApplicationDto {
+  id: string;
+  amount: string;
+  appliedDate: string;
+  invoice: { id: string; number: string; invoiceDate: string; total: string; balanceDue: string };
+}
+
+export interface CreditNoteDto extends Omit<CreditNoteListItemDto, 'customer'> {
+  reason: string | null;
+  returnToStock: boolean;
+  subtotal: string;
+  discountTotal: string;
+  taxTotal: string;
+  taxBreakdown: TaxBreakdownEntry[];
+  shippingCharge: string;
+  adjustment: string;
+  amountApplied: string;
+  amountRefunded: string;
+  customerNotes: string | null;
+  terms: string | null;
+  lines: DocumentLineDto[];
+  customer: DocumentCustomerDto;
+  applications: CreditApplicationDto[];
+  refunds: PaymentRefundDto[];
+  openedAt: string | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+  createdBy: NamedRef | null;
+  createdAt: string;
+  updatedAt: string;
 }

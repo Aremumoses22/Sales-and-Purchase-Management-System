@@ -1,6 +1,12 @@
 'use client';
 
-import type { AddressDto, InvoiceListItemDto, PaymentReceivedListItemDto, QuoteListItemDto } from '@spms/shared';
+import type {
+  AddressDto,
+  CreditNoteListItemDto,
+  InvoiceListItemDto,
+  PaymentReceivedListItemDto,
+  QuoteListItemDto,
+} from '@spms/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   ArrowLeftIcon,
@@ -14,6 +20,7 @@ import {
   PhoneIcon,
   PlusIcon,
   ReceiptIcon,
+  WalletIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -42,6 +49,7 @@ import {
   useDeleteCustomer,
   useSetCustomerActive,
 } from '@/features/customers/api';
+import { useCreditNotes } from '@/features/credit-notes/api';
 import { useInvoices } from '@/features/invoices/api';
 import { usePayments } from '@/features/payments/api';
 import { useQuotes } from '@/features/quotes/api';
@@ -145,6 +153,46 @@ function CustomerPayments({ customerId }: { customerId: string }) {
         rowKey={(row) => row.id}
         rowHref={(row) => `/payments-received/${row.id}`}
         empty={<EmptyState icon={<BanknoteArrowDownIcon className="size-7" />} title="No payments from this customer yet" />}
+      />
+    </div>
+  );
+}
+
+function CustomerCreditNotes({ customerId }: { customerId: string }) {
+  const organization = useOrganization();
+  const can = useCan();
+  const { data, isPending } = useCreditNotes({ customerId, pageSize: 10, status: 'all', sort: '-date' }, can('credit_notes:view'));
+
+  const columns: ColumnDef<CreditNoteListItemDto, unknown>[] = [
+    { id: 'date', header: 'Date', cell: ({ row }) => formatDate(row.original.creditNoteDate, organization) },
+    { id: 'number', header: 'Credit note#', cell: ({ row }) => <span className="font-medium text-primary">{row.original.number}</span> },
+    { id: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.displayStatus} /> },
+    { id: 'invoice', header: 'Invoice#', cell: ({ row }) => <span className="text-muted-foreground">{row.original.invoice?.number ?? '—'}</span> },
+    { id: 'total', header: 'Amount', meta: { align: 'right' }, cell: ({ row }) => <Money value={row.original.total} /> },
+    { id: 'balance', header: 'Balance', meta: { align: 'right' }, cell: ({ row }) => <Money value={row.original.balance} muteZero /> },
+  ];
+
+  if (!can('credit_notes:view')) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Credit notes</h3>
+        {can('credit_notes:create') ? (
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/credit-notes/new?customerId=${customerId}`} />}>
+            <PlusIcon />
+            New credit note
+          </Button>
+        ) : null}
+      </div>
+      <DataTable
+        columns={columns}
+        data={data?.data}
+        meta={data?.meta}
+        isLoading={isPending}
+        rowKey={(row) => row.id}
+        rowHref={(row) => `/credit-notes/${row.id}`}
+        empty={<EmptyState icon={<WalletIcon className="size-7" />} title="No credit notes for this customer yet" />}
       />
     </div>
   );
@@ -274,7 +322,7 @@ export default function CustomerDetailPage() {
               Edit
             </Button>
           ) : null}
-          {customer.isActive && (can('invoices:create') || can('quotes:create') || can('payments_received:create')) ? (
+          {customer.isActive && (can('invoices:create') || can('quotes:create') || can('payments_received:create') || can('credit_notes:create')) ? (
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button />}>
                 <PlusIcon />
@@ -290,6 +338,9 @@ export default function CustomerDetailPage() {
                 ) : null}
                 {can('payments_received:create') ? (
                   <DropdownMenuItem render={<Link href={`/payments-received/new?customerId=${id}`} />}>Payment received</DropdownMenuItem>
+                ) : null}
+                {can('credit_notes:create') ? (
+                  <DropdownMenuItem render={<Link href={`/credit-notes/new?customerId=${id}`} />}>Credit note</DropdownMenuItem>
                 ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -431,6 +482,7 @@ export default function CustomerDetailPage() {
           <div className="space-y-8">
             <CustomerInvoices customerId={id} />
             <CustomerPayments customerId={id} />
+            <CustomerCreditNotes customerId={id} />
             <CustomerQuotes customerId={id} />
           </div>
         </TabsContent>

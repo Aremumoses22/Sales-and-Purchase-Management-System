@@ -58,7 +58,7 @@ function useInvalidatePayments() {
   const queryClient = useQueryClient();
   return () =>
     Promise.all(
-      [paymentsKey, ['invoices'], ['customers'], ['items']].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+      [paymentsKey, ['invoices'], ['customers'], ['items'], ['credit-notes']].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     );
 }
 

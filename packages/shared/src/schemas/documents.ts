@@ -47,7 +47,7 @@ export const documentLineSchema = z
 export type DocumentLineInput = z.input<typeof documentLineSchema>;
 export type DocumentLineOutput = z.output<typeof documentLineSchema>;
 
-const documentFields = {
+export const documentFields = {
   lines: z.array(documentLineSchema).min(1, 'Add at least one line item').max(200),
   shippingCharge: moneySchema.default('0'),
   adjustment: signedMoneySchema.default('0'),
