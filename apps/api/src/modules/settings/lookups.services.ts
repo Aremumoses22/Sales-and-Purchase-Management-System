@@ -75,6 +75,14 @@ export class PaymentModesService extends LookupService<PaymentMode, PaymentModeD
   protected toDto(row: PaymentMode): PaymentModeDto {
     return { id: row.id, name: row.name, isDefault: row.isDefault, isActive: row.isActive };
   }
+
+  protected override async usageCount(id: string): Promise<number> {
+    const [payments, refunds] = await Promise.all([
+      this.prisma.paymentReceived.count({ where: { paymentModeId: id } }),
+      this.prisma.paymentRefund.count({ where: { paymentModeId: id } }),
+    ]);
+    return payments + refunds;
+  }
 }
 
 @Injectable()

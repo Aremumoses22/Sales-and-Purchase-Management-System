@@ -11,3 +11,4 @@ export * from './schemas/settings.js';
 export * from './schemas/contacts.js';
 export * from './schemas/items.js';
 export * from './schemas/documents.js';
+export * from './schemas/payments.js';

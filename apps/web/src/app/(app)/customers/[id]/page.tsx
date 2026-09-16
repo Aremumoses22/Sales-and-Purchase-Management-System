@@ -1,9 +1,10 @@
 'use client';
 
-import type { AddressDto, InvoiceListItemDto, QuoteListItemDto } from '@spms/shared';
+import type { AddressDto, InvoiceListItemDto, PaymentReceivedListItemDto, QuoteListItemDto } from '@spms/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   ArrowLeftIcon,
+  BanknoteArrowDownIcon,
   ChevronDownIcon,
   FileTextIcon,
   Loader2Icon,
@@ -42,6 +43,7 @@ import {
   useSetCustomerActive,
 } from '@/features/customers/api';
 import { useInvoices } from '@/features/invoices/api';
+import { usePayments } from '@/features/payments/api';
 import { useQuotes } from '@/features/quotes/api';
 import { addressLines } from '@/lib/address';
 import { formatDate } from '@/lib/format';
@@ -103,8 +105,47 @@ function CustomerQuotes({ customerId }: { customerId: string }) {
         empty={<EmptyState icon={<FileTextIcon className="size-7" />} title="No quotes for this customer yet" />}
       />
       <p className="text-xs text-muted-foreground">
-        Payments, sales receipts and credit notes appear here as those modules are added.
+        Sales receipts and credit notes appear here as those modules are added.
       </p>
+    </div>
+  );
+}
+
+function CustomerPayments({ customerId }: { customerId: string }) {
+  const organization = useOrganization();
+  const can = useCan();
+  const { data, isPending } = usePayments({ customerId, pageSize: 10, sort: '-date' }, can('payments_received:view'));
+
+  const columns: ColumnDef<PaymentReceivedListItemDto, unknown>[] = [
+    { id: 'date', header: 'Date', cell: ({ row }) => formatDate(row.original.paymentDate, organization) },
+    { id: 'number', header: 'Payment#', cell: ({ row }) => <span className="font-medium text-primary">{row.original.number}</span> },
+    { id: 'mode', header: 'Mode', cell: ({ row }) => row.original.paymentMode?.name ?? '—' },
+    { id: 'amount', header: 'Amount', meta: { align: 'right' }, cell: ({ row }) => <Money value={row.original.amount} /> },
+    { id: 'unused', header: 'Unused', meta: { align: 'right' }, cell: ({ row }) => <Money value={row.original.unusedAmount} muteZero /> },
+  ];
+
+  if (!can('payments_received:view')) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Payments received</h3>
+        {can('payments_received:create') ? (
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/payments-received/new?customerId=${customerId}`} />}>
+            <PlusIcon />
+            Record payment
+          </Button>
+        ) : null}
+      </div>
+      <DataTable
+        columns={columns}
+        data={data?.data}
+        meta={data?.meta}
+        isLoading={isPending}
+        rowKey={(row) => row.id}
+        rowHref={(row) => `/payments-received/${row.id}`}
+        empty={<EmptyState icon={<BanknoteArrowDownIcon className="size-7" />} title="No payments from this customer yet" />}
+      />
     </div>
   );
 }
@@ -233,7 +274,7 @@ export default function CustomerDetailPage() {
               Edit
             </Button>
           ) : null}
-          {customer.isActive && (can('invoices:create') || can('quotes:create')) ? (
+          {customer.isActive && (can('invoices:create') || can('quotes:create') || can('payments_received:create')) ? (
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button />}>
                 <PlusIcon />
@@ -246,6 +287,9 @@ export default function CustomerDetailPage() {
                 ) : null}
                 {can('quotes:create') ? (
                   <DropdownMenuItem render={<Link href={`/quotes/new?customerId=${id}`} />}>Quote</DropdownMenuItem>
+                ) : null}
+                {can('payments_received:create') ? (
+                  <DropdownMenuItem render={<Link href={`/payments-received/new?customerId=${id}`} />}>Payment received</DropdownMenuItem>
                 ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -386,6 +430,7 @@ export default function CustomerDetailPage() {
         <TabsContent value="transactions" className="mt-4">
           <div className="space-y-8">
             <CustomerInvoices customerId={id} />
+            <CustomerPayments customerId={id} />
             <CustomerQuotes customerId={id} />
           </div>
         </TabsContent>

@@ -1,4 +1,4 @@
-import { moneyString, quantityString, type DecimalLike } from '@spms/shared';
+import { moneyString, quantityString, type DecimalLike, type NumericInput } from '@spms/shared';
 
 export const toIso = (value: Date): string => value.toISOString();
 
@@ -12,7 +12,7 @@ export const toDateOnlyOrNull = (value: Date | null): string | null =>
 
 export const fromDateOnly = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
 
-export const money = (value: DecimalLike): string => moneyString(value);
+export const money = (value: NumericInput): string => moneyString(value);
 
 export const moneyOrNull = (value: DecimalLike | null): string | null =>
   value === null ? null : moneyString(value);

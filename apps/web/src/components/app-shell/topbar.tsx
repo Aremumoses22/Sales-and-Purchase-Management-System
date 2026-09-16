@@ -121,6 +121,7 @@ function QuickCreate() {
   const actions = [
     { href: '/invoices/new', label: 'Invoice', permission: 'invoices:create' as const },
     { href: '/quotes/new', label: 'Quote', permission: 'quotes:create' as const },
+    { href: '/payments-received/new', label: 'Payment received', permission: 'payments_received:create' as const },
     { href: '/customers/new', label: 'Customer', permission: 'customers:create' as const },
     { href: '/items/new', label: 'Item', permission: 'items:create' as const },
   ].filter((action) => can(action.permission));

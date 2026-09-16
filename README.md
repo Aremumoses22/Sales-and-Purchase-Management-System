@@ -11,8 +11,9 @@ A web app for managing customers, items, quotes, invoices, payments, vendors and
 | 2 Customers | Customers with addresses and contact people, search, history | Done |
 | 3 Items | Goods and services, prices and taxes, stock tracking and adjustments | Done |
 | 4 Quotes | Quote editor with live totals, status workflow, split view, print/PDF | Done |
-| 5 Invoices | Invoices from scratch or from accepted quotes, payment terms and due dates, overdue tracking, stock updates, void, print/PDF | Done (recording payments arrives with Module 6) |
-| 6–14 | Payments, credit notes, receipts, recurring invoices, vendors, expenses, bills, dashboard, reports | Planned |
+| 5 Invoices | Invoices from scratch or from accepted quotes, payment terms and due dates, overdue tracking, stock updates, void, print/PDF | Done |
+| 6 Payments Received | Record one payment across several invoices, keep the excess as unused credit, apply credits to invoices, refunds, receipts | Done |
+| 7–14 | Credit notes, sales receipts, recurring invoices, vendors, expenses, bills, dashboard, reports | Planned |
 
 ## Stack
 

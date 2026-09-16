@@ -272,11 +272,12 @@ export class ContactsService {
 
   async remove(type: ContactType, id: string): Promise<void> {
     const contact = await this.find(type, id);
-    const [quotes, invoices] = await Promise.all([
+    const [quotes, invoices, payments] = await Promise.all([
       this.prisma.quote.count({ where: { customerId: id } }),
       this.prisma.invoice.count({ where: { customerId: id } }),
+      this.prisma.paymentReceived.count({ where: { customerId: id } }),
     ]);
-    const transactions = quotes + invoices;
+    const transactions = quotes + invoices + payments;
     if (transactions > 0) {
       throw conflict(
         'CONTACT_HAS_TRANSACTIONS',
@@ -297,7 +298,7 @@ export class ContactsService {
     const balances = type === 'customer' ? await this.invoiceBalances([id]) : new Map<string, Decimal>();
     return {
       outstandingReceivables: money(toDecimal(contact.openingBalance).plus(balances.get(id) ?? 0)),
-      unusedCredits: '0.00',
+      unusedCredits: type === 'customer' ? money(await this.unusedPayments(id)) : '0.00',
     };
   }
 
@@ -315,6 +316,15 @@ export class ContactsService {
       _sum: { balanceDue: true },
     });
     return new Map(rows.map((row) => [row.customerId, toDecimal(row._sum.balanceDue)]));
+  }
+
+  /** Money received from a customer that is not yet applied to an invoice or refunded. */
+  private async unusedPayments(customerId: string): Promise<Decimal> {
+    const { _sum } = await this.prisma.paymentReceived.aggregate({
+      where: { customerId },
+      _sum: { amount: true, amountApplied: true, amountRefunded: true },
+    });
+    return toDecimal(_sum.amount).minus(toDecimal(_sum.amountApplied)).minus(toDecimal(_sum.amountRefunded));
   }
 
   private async find(type: ContactType, id: string): Promise<ContactWithRelations> {

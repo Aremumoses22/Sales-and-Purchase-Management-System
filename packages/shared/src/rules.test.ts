@@ -5,6 +5,7 @@ import { ALL_PERMISSIONS, DEFAULT_ROLES, isPermission } from './permissions.js';
 import { contactSchema } from './schemas/contacts.js';
 import { documentLineSchema, invoiceSchema, quoteSchema } from './schemas/documents.js';
 import { itemSchema } from './schemas/items.js';
+import { paymentReceivedSchema } from './schemas/payments.js';
 import { canPerformInvoiceAction, canPerformQuoteAction, getInvoiceDisplayStatus, getQuoteDisplayStatus } from './statuses.js';
 
 describe('quote status rules', () => {
@@ -158,5 +159,39 @@ describe('invoice status rules', () => {
       lines: [{ name: 'Widget', quantity: '1', rate: '10' }],
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('payment schemas', () => {
+  const customerId = '0199b5a0-0000-7000-8000-000000000001';
+  const invoiceA = '0199b5a0-0000-7000-8000-00000000000a';
+  const invoiceB = '0199b5a0-0000-7000-8000-00000000000b';
+
+  it('accepts a payment split across invoices with some left unused', () => {
+    const result = paymentReceivedSchema.safeParse({
+      customerId,
+      paymentDate: '2026-09-16',
+      amount: '1000',
+      allocations: [
+        { invoiceId: invoiceA, amount: '600' },
+        { invoiceId: invoiceB, amount: '300.50' },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('refuses to apply more than was received, the same invoice twice, or a zero amount', () => {
+    const base = { customerId, paymentDate: '2026-09-16', amount: '500' };
+    expect(paymentReceivedSchema.safeParse({ ...base, allocations: [{ invoiceId: invoiceA, amount: '500.01' }] }).success).toBe(false);
+    expect(
+      paymentReceivedSchema.safeParse({
+        ...base,
+        allocations: [
+          { invoiceId: invoiceA, amount: '100' },
+          { invoiceId: invoiceA, amount: '100' },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(paymentReceivedSchema.safeParse({ ...base, amount: '0' }).success).toBe(false);
   });
 });

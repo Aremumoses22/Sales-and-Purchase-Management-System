@@ -12,7 +12,7 @@ export interface DocumentListRow {
   title: string;
   amount: string;
   subtitle: string;
-  status: string;
+  status?: string;
 }
 
 /** The left column of Zoho's split view: the list stays visible while one document is open. */
@@ -66,7 +66,7 @@ export function DocumentListPane({
                   </div>
                   <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                     <span className="truncate">{row.subtitle}</span>
-                    <StatusBadge status={row.status} />
+                    {row.status ? <StatusBadge status={row.status} /> : null}
                   </div>
                 </Link>
               </li>

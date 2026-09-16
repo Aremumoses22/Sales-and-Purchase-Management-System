@@ -346,10 +346,82 @@ export interface InvoiceDto extends Omit<InvoiceListItemDto, 'customer'> {
   customer: DocumentCustomerDto;
   /** The quote this invoice was converted from. */
   quote: { id: string; number: string } | null;
+  payments: InvoicePaymentDto[];
   sentAt: string | null;
   voidedAt: string | null;
   voidReason: string | null;
   createdBy: NamedRef | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ---------- Payments received ----------
+
+export interface InvoicePaymentDto {
+  paymentId: string;
+  number: string;
+  paymentDate: string;
+  paymentMode: string | null;
+  /** Amount of this payment applied to the invoice. */
+  amount: string;
+}
+
+export interface PaymentReceivedListItemDto {
+  id: string;
+  number: string;
+  paymentDate: string;
+  referenceNumber: string | null;
+  paymentMode: NamedRef | null;
+  amount: string;
+  unusedAmount: string;
+  customer: { id: string; displayName: string };
+}
+
+export interface PaymentAllocationDto {
+  id: string;
+  amount: string;
+  invoice: { id: string; number: string; invoiceDate: string; total: string; balanceDue: string };
+}
+
+export interface PaymentRefundDto {
+  id: string;
+  refundDate: string;
+  amount: string;
+  paymentMode: NamedRef | null;
+  referenceNumber: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface PaymentReceivedDto extends Omit<PaymentReceivedListItemDto, 'customer'> {
+  bankCharges: string;
+  notes: string | null;
+  amountApplied: string;
+  amountRefunded: string;
+  allocations: PaymentAllocationDto[];
+  refunds: PaymentRefundDto[];
+  customer: DocumentCustomerDto;
+  createdBy: NamedRef | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** An invoice that can still take a payment. */
+export interface OpenInvoiceDto {
+  id: string;
+  number: string;
+  invoiceDate: string;
+  dueDate: string;
+  status: InvoiceStatus;
+  displayStatus: InvoiceDisplayStatus;
+  total: string;
+  /** Balance available to this payment (includes what it already applied when editing). */
+  balanceDue: string;
+  /** Already applied from the payment being edited. */
+  allocated: string;
+}
+
+export interface AvailableCreditsDto {
+  payments: { id: string; number: string; paymentDate: string; unusedAmount: string }[];
+  total: string;
 }

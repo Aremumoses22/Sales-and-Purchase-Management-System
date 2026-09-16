@@ -53,6 +53,12 @@ const INVOICE_INCLUDE = {
   paymentTerm: { select: { id: true, name: true, days: true } },
   quote: { select: { id: true, number: true } },
   createdBy: { select: { id: true, name: true } },
+  allocations: {
+    include: {
+      payment: { select: { id: true, number: true, paymentDate: true, paymentMode: { select: { name: true } } } },
+    },
+    orderBy: { createdAt: 'asc' },
+  },
 } satisfies Prisma.InvoiceInclude;
 
 type InvoiceDetail = Prisma.InvoiceGetPayload<{ include: typeof INVOICE_INCLUDE }>;
@@ -111,6 +117,13 @@ function toInvoiceDto(invoice: InvoiceDetail, today: string): InvoiceDto {
     lines: invoice.lines.map(toDocumentLineDto),
     customer: toDocumentCustomer(invoice.customer),
     quote: invoice.quote,
+    payments: invoice.allocations.map((allocation) => ({
+      paymentId: allocation.payment.id,
+      number: allocation.payment.number,
+      paymentDate: toDateOnly(allocation.payment.paymentDate),
+      paymentMode: allocation.payment.paymentMode?.name ?? null,
+      amount: money(allocation.amount),
+    })),
     sentAt: toIsoOrNull(invoice.sentAt),
     voidedAt: toIsoOrNull(invoice.voidedAt),
     voidReason: invoice.voidReason,
@@ -435,6 +448,58 @@ export class InvoicesService {
   async history(id: string): Promise<AuditLogDto[]> {
     await this.find(id);
     return this.audit.history('invoice', id);
+  }
+
+  /** Locks an invoice for payment work and returns what payment rules need to check. */
+  async lockForPayment(tx: Tx, id: string) {
+    await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${id}::uuid FOR UPDATE`;
+    return tx.invoice.findUnique({
+      where: { id },
+      select: { id: true, number: true, customerId: true, status: true, total: true, balanceDue: true },
+    });
+  }
+
+  /**
+   * Recomputes the amount paid and balance of each invoice from what has been applied to it
+   * (PLAN.md §4.4). Called inside the transaction that changed the payments. A draft invoice
+   * that receives money is marked as sent, which also takes its stock.
+   */
+  async refreshBalances(tx: Tx, invoiceIds: string[]): Promise<void> {
+    for (const id of [...new Set(invoiceIds)].sort()) {
+      await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${id}::uuid FOR UPDATE`;
+      const invoice = await tx.invoice.findUnique({ where: { id }, include: { lines: true } });
+      if (!invoice) continue;
+
+      const { _sum } = await tx.paymentAllocation.aggregate({ where: { invoiceId: id }, _sum: { amount: true } });
+      const paid = toDecimal(_sum.amount);
+      const total = toDecimal(invoice.total);
+      if (paid.gt(total)) {
+        throw conflict('OVERPAID', `Payments applied to invoice ${invoice.number} would exceed its total`);
+      }
+
+      const becomesSent = invoice.status === 'draft' && paid.gt(0);
+      await tx.invoice.update({
+        where: { id },
+        data: {
+          amountPaid: paid.toFixed(2),
+          balanceDue: total.minus(paid).toFixed(2),
+          ...(becomesSent ? { status: 'sent' as const, sentAt: new Date() } : {}),
+        },
+      });
+      if (becomesSent) {
+        await this.syncStock(tx, invoice, invoice.lines);
+        await this.audit.record(
+          {
+            action: 'status_changed',
+            entityType: 'invoice',
+            entityId: id,
+            summary: `Invoice ${invoice.number} marked as sent when a payment was recorded`,
+            changes: { status: { from: 'draft', to: 'sent' } },
+          },
+          tx,
+        );
+      }
+    }
   }
 
   private async insert(
