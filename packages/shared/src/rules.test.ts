@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { formatDocumentNumber } from './constants.js';
-import { addDays, isDateOnly, todayInTimeZone } from './dates.js';
+import { addDays, daysBetween, isDateOnly, todayInTimeZone } from './dates.js';
 import { ALL_PERMISSIONS, DEFAULT_ROLES, isPermission } from './permissions.js';
 import { contactSchema } from './schemas/contacts.js';
-import { documentLineSchema, quoteSchema } from './schemas/documents.js';
+import { documentLineSchema, invoiceSchema, quoteSchema } from './schemas/documents.js';
 import { itemSchema } from './schemas/items.js';
-import { canPerformQuoteAction, getQuoteDisplayStatus } from './statuses.js';
+import { canPerformInvoiceAction, canPerformQuoteAction, getInvoiceDisplayStatus, getQuoteDisplayStatus } from './statuses.js';
 
 describe('quote status rules', () => {
   it('shows a sent quote past its expiry date as expired', () => {
@@ -118,5 +118,45 @@ describe('schemas', () => {
   it('only lets goods track inventory', () => {
     expect(itemSchema.safeParse({ type: 'service', name: 'Consulting', trackInventory: true }).success).toBe(false);
     expect(itemSchema.safeParse({ type: 'goods', name: 'Widget', trackInventory: true, openingStock: '10' }).success).toBe(true);
+  });
+});
+
+describe('invoice status rules', () => {
+  const base = { status: 'sent' as const, amountPaid: '0', balanceDue: '100', dueDate: '2026-09-30' };
+
+  it('derives one display status from balance and due date', () => {
+    expect(getInvoiceDisplayStatus({ ...base, status: 'draft' }, '2026-10-05')).toBe('draft');
+    expect(getInvoiceDisplayStatus({ ...base, status: 'void' }, '2026-10-05')).toBe('void');
+    expect(getInvoiceDisplayStatus(base, '2026-09-30')).toBe('sent');
+    expect(getInvoiceDisplayStatus(base, '2026-10-01')).toBe('overdue');
+    expect(getInvoiceDisplayStatus({ ...base, amountPaid: '40', balanceDue: '60' }, '2026-09-15')).toBe('partially_paid');
+    expect(getInvoiceDisplayStatus({ ...base, amountPaid: '40', balanceDue: '60' }, '2026-10-01')).toBe('overdue');
+    expect(getInvoiceDisplayStatus({ ...base, amountPaid: '100', balanceDue: '0' }, '2026-12-01')).toBe('paid');
+  });
+
+  it('allows deleting drafts only and voiding only unpaid sent invoices', () => {
+    expect(canPerformInvoiceAction('delete', { ...base, status: 'draft' })).toBe(true);
+    expect(canPerformInvoiceAction('delete', base)).toBe(false);
+    expect(canPerformInvoiceAction('void', base)).toBe(true);
+    expect(canPerformInvoiceAction('void', { ...base, amountPaid: '1', balanceDue: '99' })).toBe(false);
+    expect(canPerformInvoiceAction('void', { ...base, status: 'draft' })).toBe(false);
+    expect(canPerformInvoiceAction('edit', { ...base, status: 'void' })).toBe(false);
+    expect(canPerformInvoiceAction('recordPayment', { ...base, amountPaid: '100', balanceDue: '0' })).toBe(false);
+    expect(canPerformInvoiceAction('recordPayment', { ...base, status: 'draft' })).toBe(true);
+  });
+
+  it('counts days between dates', () => {
+    expect(daysBetween('2026-09-01', '2026-10-01')).toBe(30);
+    expect(daysBetween('2026-10-01', '2026-09-01')).toBe(-30);
+  });
+
+  it('rejects a due date before the invoice date', () => {
+    const result = invoiceSchema.safeParse({
+      customerId: '0199b5a0-0000-7000-8000-000000000001',
+      invoiceDate: '2026-09-15',
+      dueDate: '2026-09-14',
+      lines: [{ name: 'Widget', quantity: '1', rate: '10' }],
+    });
+    expect(result.success).toBe(false);
   });
 });

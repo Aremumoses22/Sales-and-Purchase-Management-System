@@ -89,6 +89,16 @@ function GlobalSearch() {
               ))}
             </CommandGroup>
           ) : null}
+          {data?.invoices.length ? (
+            <CommandGroup heading="Invoices">
+              {data.invoices.map((invoice) => (
+                <CommandItem key={invoice.id} value={`invoice-${invoice.id}`} onSelect={() => go(`/invoices/${invoice.id}`)}>
+                  {invoice.number}
+                  <span className="text-muted-foreground"> · {invoice.customerName}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
           {data?.quotes.length ? (
             <CommandGroup heading="Quotes">
               {data.quotes.map((quote) => (
@@ -109,6 +119,7 @@ function GlobalSearch() {
 function QuickCreate() {
   const can = useCan();
   const actions = [
+    { href: '/invoices/new', label: 'Invoice', permission: 'invoices:create' as const },
     { href: '/quotes/new', label: 'Quote', permission: 'quotes:create' as const },
     { href: '/customers/new', label: 'Customer', permission: 'customers:create' as const },
     { href: '/items/new', label: 'Item', permission: 'items:create' as const },

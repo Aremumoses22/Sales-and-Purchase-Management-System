@@ -4,12 +4,16 @@ import { quoteListQuerySchema, quoteSchema, type QuoteListQuery, type QuoteOutpu
 import { RequirePermissions } from '../../common/decorators.js';
 import { ApiZodBody } from '../../common/swagger.js';
 import { uuidParam } from '../../common/validation.js';
+import { InvoicesService } from '../invoices/invoices.service.js';
 import { QuotesService } from './quotes.service.js';
 
 @ApiTags('Quotes')
 @Controller('quotes')
 export class QuotesController {
-  constructor(private readonly quotes: QuotesService) {}
+  constructor(
+    private readonly quotes: QuotesService,
+    private readonly invoices: InvoicesService,
+  ) {}
 
   @Get()
   @RequirePermissions('quotes:view')
@@ -76,6 +80,12 @@ export class QuotesController {
   @HttpCode(HttpStatus.OK)
   decline(@Param('id', { schema: uuidParam }) id: string) {
     return this.quotes.decline(id);
+  }
+
+  @Post(':id/convert-to-invoice')
+  @RequirePermissions('quotes:edit', 'invoices:create')
+  convertToInvoice(@Param('id', { schema: uuidParam }) id: string) {
+    return this.invoices.convertQuote(id);
   }
 
   @Post(':id/clone')

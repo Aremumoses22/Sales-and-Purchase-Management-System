@@ -28,6 +28,7 @@ model User {
   itemsCreated           Item[]          @relation("ItemCreatedBy")
   stockMovementsCreated  StockMovement[] @relation("StockMovementCreatedBy")
   quotesCreated          Quote[]         @relation("QuoteCreatedBy")
+  invoicesCreated        Invoice[]       @relation("InvoiceCreatedBy")
 
   @@map("users")
 }
@@ -136,6 +137,7 @@ model PaymentTerm {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   contacts Contact[]
+  invoices Invoice[]
 
   @@map("payment_terms")
 }
@@ -148,8 +150,9 @@ model Tax {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  items      Item[]
-  quoteLines QuoteLine[]
+  items        Item[]
+  quoteLines   QuoteLine[]
+  invoiceLines InvoiceLine[]
 
   @@map("taxes")
 }
@@ -220,6 +223,7 @@ model Contact {
   addresses         ContactAddress[]
   contactPersons    ContactPerson[]
   quotes            Quote[]
+  invoices          Invoice[]
   preferredForItems Item[]           @relation("ItemPreferredVendor")
 
   @@index([type, isActive, displayName])
@@ -303,6 +307,7 @@ model Item {
 
   stockMovements StockMovement[]
   quoteLines     QuoteLine[]
+  invoiceLines   InvoiceLine[]
 
   @@index([isActive, name])
   @@map("items")
@@ -368,7 +373,8 @@ model Quote {
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  lines QuoteLine[]
+  lines   QuoteLine[]
+  invoice Invoice?
 
   @@index([customerId])
   @@index([status, quoteDate])
@@ -400,4 +406,80 @@ model QuoteLine {
   @@index([quoteId])
   @@index([itemId])
   @@map("quote_lines")
+}
+
+// ─────────────────────────────── Sales: Invoices ───────────────────────────────
+
+/// Paid, partially paid and overdue are derived from balance_due and due_date.
+enum InvoiceStatus {
+  draft
+  sent
+  void
+}
+
+model Invoice {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  number         String        @unique
+  customerId     String        @map("customer_id") @db.Uuid
+  customer       Contact       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  quoteId        String?       @unique @map("quote_id") @db.Uuid
+  quote          Quote?        @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  invoiceDate    DateTime      @map("invoice_date") @db.Date
+  dueDate        DateTime      @map("due_date") @db.Date
+  paymentTermId  String?       @map("payment_term_id") @db.Uuid
+  paymentTerm    PaymentTerm?  @relation(fields: [paymentTermId], references: [id], onDelete: SetNull)
+  orderNumber    String?       @map("order_number")
+  subject        String?
+  status         InvoiceStatus @default(draft)
+  subtotal       Decimal       @db.Decimal(18, 2)
+  discountTotal  Decimal       @map("discount_total") @db.Decimal(18, 2)
+  taxTotal       Decimal       @map("tax_total") @db.Decimal(18, 2)
+  shippingCharge Decimal       @default(0) @map("shipping_charge") @db.Decimal(18, 2)
+  adjustment     Decimal       @default(0) @db.Decimal(18, 2)
+  total          Decimal       @db.Decimal(18, 2)
+  /// Payments and credits applied so far.
+  amountPaid     Decimal       @default(0) @map("amount_paid") @db.Decimal(18, 2)
+  balanceDue     Decimal       @map("balance_due") @db.Decimal(18, 2)
+  customerNotes  String?       @map("customer_notes")
+  terms          String?
+  sentAt         DateTime?     @map("sent_at")
+  voidedAt       DateTime?     @map("voided_at")
+  voidReason     String?       @map("void_reason")
+  createdById    String?       @map("created_by_id") @db.Uuid
+  createdBy      User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  lines InvoiceLine[]
+
+  @@index([customerId])
+  @@index([status, dueDate])
+  @@index([invoiceDate])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id            String       @id @default(uuid(7)) @db.Uuid
+  invoiceId     String       @map("invoice_id") @db.Uuid
+  invoice       Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  position      Int
+  itemId        String?      @map("item_id") @db.Uuid
+  item          Item?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  name          String
+  description   String?
+  quantity      Decimal      @db.Decimal(18, 3)
+  unit          String?
+  rate          Decimal      @db.Decimal(18, 2)
+  discountType  DiscountType @default(percent) @map("discount_type")
+  discountValue Decimal      @default(0) @map("discount_value") @db.Decimal(18, 2)
+  taxId         String?      @map("tax_id") @db.Uuid
+  tax           Tax?         @relation(fields: [taxId], references: [id], onDelete: SetNull)
+  taxName       String?      @map("tax_name")
+  taxRate       Decimal?     @map("tax_rate") @db.Decimal(6, 3)
+  amount        Decimal      @db.Decimal(18, 2)
+  taxAmount     Decimal      @map("tax_amount") @db.Decimal(18, 2)
+
+  @@index([invoiceId])
+  @@index([itemId])
+  @@map("invoice_lines")
 }

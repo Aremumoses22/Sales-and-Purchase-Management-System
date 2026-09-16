@@ -1,9 +1,10 @@
 'use client';
 
-import type { AddressDto, QuoteListItemDto } from '@spms/shared';
+import type { AddressDto, InvoiceListItemDto, QuoteListItemDto } from '@spms/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   ArrowLeftIcon,
+  ChevronDownIcon,
   FileTextIcon,
   Loader2Icon,
   MailIcon,
@@ -11,6 +12,7 @@ import {
   PencilIcon,
   PhoneIcon,
   PlusIcon,
+  ReceiptIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -39,6 +41,7 @@ import {
   useDeleteCustomer,
   useSetCustomerActive,
 } from '@/features/customers/api';
+import { useInvoices } from '@/features/invoices/api';
 import { useQuotes } from '@/features/quotes/api';
 import { addressLines } from '@/lib/address';
 import { formatDate } from '@/lib/format';
@@ -100,8 +103,48 @@ function CustomerQuotes({ customerId }: { customerId: string }) {
         empty={<EmptyState icon={<FileTextIcon className="size-7" />} title="No quotes for this customer yet" />}
       />
       <p className="text-xs text-muted-foreground">
-        Invoices, payments, receipts and credit notes appear here as those modules are added.
+        Payments, sales receipts and credit notes appear here as those modules are added.
       </p>
+    </div>
+  );
+}
+
+function CustomerInvoices({ customerId }: { customerId: string }) {
+  const organization = useOrganization();
+  const can = useCan();
+  const { data, isPending } = useInvoices({ customerId, pageSize: 10, status: 'all', sort: '-date' }, can('invoices:view'));
+
+  const columns: ColumnDef<InvoiceListItemDto, unknown>[] = [
+    { id: 'date', header: 'Date', cell: ({ row }) => formatDate(row.original.invoiceDate, organization) },
+    { id: 'number', header: 'Invoice#', cell: ({ row }) => <span className="font-medium text-primary">{row.original.number}</span> },
+    { id: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.displayStatus} /> },
+    { id: 'dueDate', header: 'Due date', cell: ({ row }) => formatDate(row.original.dueDate, organization) },
+    { id: 'total', header: 'Amount', meta: { align: 'right' }, cell: ({ row }) => <Money value={row.original.total} /> },
+    { id: 'balance', header: 'Balance due', meta: { align: 'right' }, cell: ({ row }) => <Money value={row.original.balanceDue} muteZero /> },
+  ];
+
+  if (!can('invoices:view')) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Invoices</h3>
+        {can('invoices:create') ? (
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/invoices/new?customerId=${customerId}`} />}>
+            <PlusIcon />
+            New invoice
+          </Button>
+        ) : null}
+      </div>
+      <DataTable
+        columns={columns}
+        data={data?.data}
+        meta={data?.meta}
+        isLoading={isPending}
+        rowKey={(row) => row.id}
+        rowHref={(row) => `/invoices/${row.id}`}
+        empty={<EmptyState icon={<ReceiptIcon className="size-7" />} title="No invoices for this customer yet" />}
+      />
     </div>
   );
 }
@@ -190,11 +233,22 @@ export default function CustomerDetailPage() {
               Edit
             </Button>
           ) : null}
-          {can('quotes:create') && customer.isActive ? (
-            <Button nativeButton={false} render={<Link href={`/quotes/new?customerId=${id}`} />}>
-              <PlusIcon />
-              New quote
-            </Button>
+          {customer.isActive && (can('invoices:create') || can('quotes:create')) ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button />}>
+                <PlusIcon />
+                New transaction
+                <ChevronDownIcon />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {can('invoices:create') ? (
+                  <DropdownMenuItem render={<Link href={`/invoices/new?customerId=${id}`} />}>Invoice</DropdownMenuItem>
+                ) : null}
+                {can('quotes:create') ? (
+                  <DropdownMenuItem render={<Link href={`/quotes/new?customerId=${id}`} />}>Quote</DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
           {can('customers:edit') || can('customers:delete') ? (
             <DropdownMenu>
@@ -330,7 +384,10 @@ export default function CustomerDetailPage() {
         </TabsContent>
 
         <TabsContent value="transactions" className="mt-4">
-          <CustomerQuotes customerId={id} />
+          <div className="space-y-8">
+            <CustomerInvoices customerId={id} />
+            <CustomerQuotes customerId={id} />
+          </div>
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">

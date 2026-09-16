@@ -24,9 +24,23 @@ export interface DocumentPreviewProps {
   };
   notes?: string | null;
   terms?: string | null;
+  /** Shown under the total on invoices. */
+  payment?: { amountPaid: string; balanceDue: string };
+  /** Diagonal corner label, e.g. "Paid" or "Overdue". */
+  ribbon?: { label: string; tone: RibbonTone };
   banner?: ReactNode;
   className?: string;
 }
+
+export type RibbonTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+
+const RIBBON_TONES: Record<RibbonTone, string> = {
+  neutral: 'bg-neutral-500',
+  info: 'bg-blue-600',
+  success: 'bg-emerald-600',
+  warning: 'bg-amber-500',
+  danger: 'bg-rose-600',
+};
 
 /** The printed layout of a sales document; the same component renders on screen and on paper. */
 export function DocumentPreview({
@@ -39,6 +53,8 @@ export function DocumentPreview({
   totals,
   notes,
   terms,
+  payment,
+  ribbon,
   banner,
   className,
 }: DocumentPreviewProps) {
@@ -56,7 +72,25 @@ export function DocumentPreview({
   const shipping = addressLines(customer.shippingAddress);
 
   return (
-    <article className={cn('print-sheet relative mx-auto w-full max-w-[210mm] bg-white p-8 text-[13px] text-neutral-900 shadow-sm ring-1 ring-black/5 sm:p-10', className)}>
+    <article
+      className={cn(
+        'print-sheet relative mx-auto w-full max-w-[210mm] bg-white p-8 text-[13px] text-neutral-900 shadow-sm ring-1 ring-black/5 sm:p-10',
+        ribbon && 'pt-14 sm:pt-16',
+        className,
+      )}
+    >
+      {ribbon ? (
+        <div className="pointer-events-none absolute top-0 left-0 size-20 overflow-hidden">
+          <div
+            className={cn(
+              'absolute top-4 -left-9 w-32 -rotate-45 py-0.5 text-center text-[10px] font-semibold tracking-widest text-white uppercase shadow-sm',
+              RIBBON_TONES[ribbon.tone],
+            )}
+          >
+            {ribbon.label}
+          </div>
+        </div>
+      ) : null}
       {banner}
 
       <header className="flex flex-wrap items-start justify-between gap-6">
@@ -200,6 +234,20 @@ export function DocumentPreview({
             <dt>Total</dt>
             <dd className="tabular-nums">{money(totals.total)}</dd>
           </div>
+          {payment ? (
+            <>
+              {Number(payment.amountPaid) > 0 ? (
+                <div className="flex justify-between px-2 text-neutral-600">
+                  <dt>Payments and credits</dt>
+                  <dd className="tabular-nums">(-) {money(payment.amountPaid)}</dd>
+                </div>
+              ) : null}
+              <div className="flex justify-between px-2 font-semibold">
+                <dt>Balance Due</dt>
+                <dd className="tabular-nums">{money(payment.balanceDue)}</dd>
+              </div>
+            </>
+          ) : null}
         </dl>
       </section>
 

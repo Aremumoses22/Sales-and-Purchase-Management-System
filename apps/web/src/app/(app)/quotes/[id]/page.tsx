@@ -1,7 +1,6 @@
 'use client';
 
 import { canPerformQuoteAction } from '@spms/shared';
-import { cn } from 'cn';
 import {
   CheckIcon,
   CopyIcon,
@@ -9,8 +8,8 @@ import {
   Loader2Icon,
   MoreHorizontalIcon,
   PencilIcon,
-  PlusIcon,
   PrinterIcon,
+  ReceiptIcon,
   SendIcon,
   XIcon,
 } from 'lucide-react';
@@ -19,9 +18,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DocumentListPane } from '@/components/documents/document-list-pane';
 import { EmptyState } from '@/components/empty-state';
 import { HistoryPanel } from '@/components/history-panel';
-import { Money } from '@/components/money';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +32,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   useCloneQuote,
+  useConvertQuote,
   useDeleteQuote,
   useQuote,
   useQuoteHistory,
@@ -51,65 +51,16 @@ const TRANSITION_MESSAGES: Record<QuoteTransition, string> = {
   decline: 'Quote marked as declined',
 };
 
-/** Zoho's split view: the quote list stays on the left while one quote is open on the right. */
-function QuoteList({ activeId }: { activeId: string }) {
-  const organization = useOrganization();
-  const can = useCan();
-  const { data, isPending } = useQuotes({ status: 'all', pageSize: 50, sort: '-date' });
-
-  return (
-    <aside className="hidden w-80 shrink-0 flex-col border-r bg-background md:flex">
-      <div className="flex h-12 items-center justify-between border-b px-4">
-        <Link href="/quotes" className="text-sm font-semibold hover:underline">
-          All quotes
-        </Link>
-        {can('quotes:create') ? (
-          <Button size="icon-sm" nativeButton={false} render={<Link href="/quotes/new" />} aria-label="New quote">
-            <PlusIcon />
-          </Button>
-        ) : null}
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {isPending ? (
-          <Loader2Icon className="mx-auto mt-6 size-5 animate-spin text-muted-foreground" />
-        ) : (
-          <ul className="divide-y">
-            {data?.data.map((row) => (
-              <li key={row.id}>
-                <Link
-                  href={`/quotes/${row.id}`}
-                  className={cn(
-                    'block space-y-1 px-4 py-3 text-sm hover:bg-muted/50',
-                    row.id === activeId && 'bg-primary/5 shadow-[inset_3px_0_0_var(--primary)]',
-                  )}
-                >
-                  <div className="flex justify-between gap-2">
-                    <span className="truncate font-medium">{row.customer.displayName}</span>
-                    <Money value={row.total} className="shrink-0" />
-                  </div>
-                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span>
-                      {row.number} · {formatDate(row.quoteDate, organization)}
-                    </span>
-                    <StatusBadge status={row.displayStatus} />
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </aside>
-  );
-}
-
 export default function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const can = useCan();
+  const organization = useOrganization();
   const { data: quote, isPending, isError } = useQuote(id);
+  const list = useQuotes({ status: 'all', pageSize: 50, sort: '-date' });
   const history = useQuoteHistory(id, true);
   const transition = useQuoteTransition();
+  const convert = useConvertQuote();
   const clone = useCloneQuote();
   const remove = useDeleteQuote();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -118,6 +69,16 @@ export default function QuoteDetailPage() {
     try {
       await transition.mutateAsync({ id, action });
       toast.success(TRANSITION_MESSAGES[action]);
+    } catch (error) {
+      showApiError(error);
+    }
+  };
+
+  const onConvert = async () => {
+    try {
+      const invoice = await convert.mutateAsync(id);
+      toast.success(`Draft invoice ${invoice.number} created from ${quote?.number}`);
+      router.push(`/invoices/${invoice.id}`);
     } catch (error) {
       showApiError(error);
     }
@@ -149,7 +110,21 @@ export default function QuoteDetailPage() {
 
   return (
     <div className="-m-4 flex h-[calc(100svh-3.5rem)] sm:-m-6">
-      <QuoteList activeId={id} />
+      <DocumentListPane
+        title="All quotes"
+        listHref="/quotes"
+        newHref={can('quotes:create') ? '/quotes/new' : undefined}
+        isLoading={list.isPending}
+        activeId={id}
+        hrefFor={(rowId) => `/quotes/${rowId}`}
+        rows={list.data?.data.map((row) => ({
+          id: row.id,
+          title: row.customer.displayName,
+          amount: row.total,
+          subtitle: `${row.number} · ${formatDate(row.quoteDate, organization)}`,
+          status: row.displayStatus,
+        }))}
+      />
 
       <section className="flex min-w-0 flex-1 flex-col">
         {isError ? (
@@ -190,10 +165,16 @@ export default function QuoteDetailPage() {
                     Declined
                   </Button>
                 ) : null}
-                {status === 'accepted' ? (
-                  <Button size="sm" disabled title="Converting to an invoice arrives with the Invoices module (Module 5)">
-                    <FileOutputIcon />
+                {status && canPerformQuoteAction('convert', status) && canEdit && can('invoices:create') ? (
+                  <Button size="sm" onClick={onConvert} disabled={convert.isPending}>
+                    {convert.isPending ? <Loader2Icon className="animate-spin" /> : <FileOutputIcon />}
                     Convert to invoice
+                  </Button>
+                ) : null}
+                {quote.invoice ? (
+                  <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/invoices/${quote.invoice.id}`} />}>
+                    <ReceiptIcon />
+                    View invoice {quote.invoice.number}
                   </Button>
                 ) : null}
 
@@ -239,7 +220,7 @@ export default function QuoteDetailPage() {
             <div className="flex-1 space-y-5 overflow-y-auto bg-muted/30 p-5 sm:p-8">
               {quote.displayStatus === 'expired' ? (
                 <p className="mx-auto max-w-[210mm] rounded-lg bg-orange-50 px-4 py-2 text-sm text-orange-800 ring-1 ring-orange-600/20">
-                  This quote expired on {quote.expiryDate}. You can still mark it as accepted or declined.
+                  This quote expired on {formatDate(quote.expiryDate, organization)}. You can still mark it as accepted or declined.
                 </p>
               ) : null}
 

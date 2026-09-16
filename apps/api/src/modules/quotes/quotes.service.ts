@@ -45,6 +45,7 @@ const QUOTE_INCLUDE = {
   lines: { orderBy: { position: 'asc' } },
   customer: { include: { addresses: true } },
   createdBy: { select: { id: true, name: true } },
+  invoice: { select: { id: true, number: true } },
 } satisfies Prisma.QuoteInclude;
 
 type QuoteDetail = Prisma.QuoteGetPayload<{ include: typeof QUOTE_INCLUDE }>;
@@ -83,6 +84,7 @@ function toQuoteDto(quote: QuoteDetail, today: string): QuoteDto {
     sentAt: toIsoOrNull(quote.sentAt),
     acceptedAt: toIsoOrNull(quote.acceptedAt),
     declinedAt: toIsoOrNull(quote.declinedAt),
+    invoice: quote.invoice,
     createdBy: quote.createdBy,
     createdAt: toIso(quote.createdAt),
     updatedAt: toIso(quote.updatedAt),

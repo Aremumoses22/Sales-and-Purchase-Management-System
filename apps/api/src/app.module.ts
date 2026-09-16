@@ -6,6 +6,7 @@ import { AuthGuard, CsrfGuard, PermissionsGuard } from './modules/auth/guards.js
 import { ContactsModule } from './modules/contacts/contacts.module.js';
 import { DocumentsModule } from './modules/documents/documents.module.js';
 import { HealthController } from './modules/health/health.controller.js';
+import { InvoicesModule } from './modules/invoices/invoices.module.js';
 import { ItemsModule } from './modules/items/items.module.js';
 import { QuotesModule } from './modules/quotes/quotes.module.js';
 import { SearchController } from './modules/search/search.controller.js';
@@ -24,6 +25,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     ItemsModule,
     DocumentsModule,
     QuotesModule,
+    InvoicesModule,
   ],
   controllers: [HealthController, SearchController],
   providers: [

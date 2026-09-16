@@ -22,12 +22,14 @@ export function useCustomers(params: Record<string, string | number>, enabled = 
   });
 }
 
+/** Shared so forms can fetch a customer imperatively and still hit the same cache entry. */
+export const customerQuery = (id: string) => ({
+  queryKey: [...customersKey, id] as const,
+  queryFn: () => api.get<ContactDto>(`/customers/${id}`),
+});
+
 export function useCustomer(id: string, enabled = true) {
-  return useQuery({
-    queryKey: [...customersKey, id],
-    queryFn: () => api.get<ContactDto>(`/customers/${id}`),
-    enabled: enabled && Boolean(id),
-  });
+  return useQuery({ ...customerQuery(id), enabled: enabled && Boolean(id) });
 }
 
 export function useCustomerSummary(id: string) {

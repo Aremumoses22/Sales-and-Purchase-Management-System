@@ -168,3 +168,18 @@ export function toDocumentCustomer(customer: {
     shippingAddress: address('shipping'),
   };
 }
+
+/** Turns stored lines back into form input, e.g. to clone a document or convert a quote. */
+export function storedLinesToInput(lines: StoredLine[]): DocumentLineOutput[] {
+  return lines.map((line) => ({
+    itemId: line.itemId,
+    name: line.name,
+    description: line.description,
+    quantity: quantity(line.quantity),
+    unit: line.unit,
+    rate: money(line.rate),
+    discountType: line.discountType,
+    discountValue: money(line.discountValue),
+    taxId: line.taxId,
+  }));
+}

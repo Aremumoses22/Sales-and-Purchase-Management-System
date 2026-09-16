@@ -29,8 +29,12 @@ export class PaymentTermsService extends LookupService<PaymentTerm, PaymentTermD
     return { id: row.id, name: row.name, days: row.days, isDefault: row.isDefault, isActive: row.isActive };
   }
 
-  protected override usageCount(id: string): Promise<number> {
-    return this.prisma.contact.count({ where: { paymentTermId: id } });
+  protected override async usageCount(id: string): Promise<number> {
+    const [contacts, invoices] = await Promise.all([
+      this.prisma.contact.count({ where: { paymentTermId: id } }),
+      this.prisma.invoice.count({ where: { paymentTermId: id } }),
+    ]);
+    return contacts + invoices;
   }
 }
 
@@ -49,11 +53,12 @@ export class TaxesService extends LookupService<Tax, TaxDto, z.output<typeof tax
   }
 
   protected override async usageCount(id: string): Promise<number> {
-    const [items, quoteLines] = await Promise.all([
+    const [items, quoteLines, invoiceLines] = await Promise.all([
       this.prisma.item.count({ where: { taxId: id } }),
       this.prisma.quoteLine.count({ where: { taxId: id } }),
+      this.prisma.invoiceLine.count({ where: { taxId: id } }),
     ]);
-    return items + quoteLines;
+    return items + quoteLines + invoiceLines;
   }
 }
 

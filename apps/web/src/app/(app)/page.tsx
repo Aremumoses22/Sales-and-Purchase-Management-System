@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRightIcon, FileTextIcon, PackageIcon, UsersIcon } from 'lucide-react';
+import { ArrowRightIcon, FileTextIcon, PackageIcon, ReceiptIcon, UsersIcon } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,13 @@ const SHORTCUTS = [
     description: 'Products and services with prices, taxes and stock levels.',
     icon: PackageIcon,
     permission: 'items:view' as const,
+  },
+  {
+    href: '/invoices',
+    label: 'Invoices',
+    description: 'Bill customers, track what is owed and see what is overdue.',
+    icon: ReceiptIcon,
+    permission: 'invoices:view' as const,
   },
   {
     href: '/quotes',

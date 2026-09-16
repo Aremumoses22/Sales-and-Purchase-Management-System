@@ -7,7 +7,7 @@ import type {
   StockMovementType,
 } from './constants.js';
 import type { Permission } from './permissions.js';
-import type { QuoteDisplayStatus, QuoteStatus } from './statuses.js';
+import type { InvoiceDisplayStatus, InvoiceStatus, QuoteDisplayStatus, QuoteStatus } from './statuses.js';
 import type { TaxBreakdownEntry } from './totals.js';
 
 export interface PageMeta {
@@ -301,6 +301,8 @@ export interface QuoteDto extends Omit<QuoteListItemDto, 'customer'> {
   sentAt: string | null;
   acceptedAt: string | null;
   declinedAt: string | null;
+  /** The invoice this quote was converted into. */
+  invoice: { id: string; number: string } | null;
   createdBy: NamedRef | null;
   createdAt: string;
   updatedAt: string;
@@ -312,4 +314,42 @@ export interface SearchResultsDto {
   customers: { id: string; displayName: string; companyName: string | null }[];
   items: { id: string; name: string; sku: string | null }[];
   quotes: { id: string; number: string; customerName: string }[];
+  invoices: { id: string; number: string; customerName: string }[];
+}
+
+export interface InvoiceListItemDto {
+  id: string;
+  number: string;
+  invoiceDate: string;
+  dueDate: string;
+  orderNumber: string | null;
+  status: InvoiceStatus;
+  displayStatus: InvoiceDisplayStatus;
+  total: string;
+  balanceDue: string;
+  customer: { id: string; displayName: string };
+}
+
+export interface InvoiceDto extends Omit<InvoiceListItemDto, 'customer'> {
+  subject: string | null;
+  paymentTerm: { id: string; name: string; days: number } | null;
+  subtotal: string;
+  discountTotal: string;
+  taxTotal: string;
+  taxBreakdown: TaxBreakdownEntry[];
+  shippingCharge: string;
+  adjustment: string;
+  amountPaid: string;
+  customerNotes: string | null;
+  terms: string | null;
+  lines: DocumentLineDto[];
+  customer: DocumentCustomerDto;
+  /** The quote this invoice was converted from. */
+  quote: { id: string; number: string } | null;
+  sentAt: string | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+  createdBy: NamedRef | null;
+  createdAt: string;
+  updatedAt: string;
 }

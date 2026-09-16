@@ -123,7 +123,8 @@ total          = subtotal + taxTotal + shipping + adjustment   (adjustment can b
 - `invoice.amountPaid = Σ payment allocations + Σ credits applied`
 - `invoice.balanceDue = total − amountPaid`
 - The stored lifecycle is `draft | sent | void`. The displayed status is derived from it:
-  `void` → Void · `draft` → Draft · balance = 0 → **Paid** · 0 < balance < total → **Partially Paid** · dueDate < today → **Overdue** · otherwise **Sent**
+  `void` → Void · `draft` → Draft · balance = 0 → **Paid** · dueDate < today → **Overdue** · 0 < balance < total → **Partially Paid** · otherwise **Sent**
+  (a partly paid invoice past its due date shows as Overdue, because that is what needs chasing; void invoices carry no balance)
 - Any change that touches an invoice balance calls `InvoiceBalanceService.recalculate(id)` **inside the same database transaction**.
 - "Overdue" is computed when data is read (`balance > 0 AND due_date < current_date`), so no nightly job is needed.
 - Customer balances are **computed by queries, never stored**, so they cannot drift out of sync:

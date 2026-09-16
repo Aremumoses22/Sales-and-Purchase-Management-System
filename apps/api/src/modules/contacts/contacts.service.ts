@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  ActiveListQuery,
-  AddressDto,
-  AuditLogDto,
-  ContactDto,
-  ContactListItemDto,
-  ContactOutput,
-  ContactSummaryDto,
-  ContactType,
-  Paginated,
+import {
+  toDecimal,
+  type ActiveListQuery,
+  type AddressDto,
+  type AuditLogDto,
+  type ContactDto,
+  type ContactListItemDto,
+  type ContactOutput,
+  type ContactSummaryDto,
+  type ContactType,
+  type Decimal,
+  type Paginated,
 } from '@spms/shared';
 import { AuditService } from '../../audit/audit.service.js';
 import { diffRecords } from '../../audit/diff.js';
@@ -175,6 +177,9 @@ export class ContactsService {
       this.prisma.contact.count({ where }),
     ]);
 
+    const balances =
+      type === 'customer' ? await this.invoiceBalances(rows.map((row) => row.id)) : new Map<string, Decimal>();
+
     return paginated(
       rows.map((row) => ({
         id: row.id,
@@ -183,7 +188,7 @@ export class ContactsService {
         email: row.email,
         workPhone: row.workPhone,
         isActive: row.isActive,
-        balance: money(row.openingBalance),
+        balance: money(toDecimal(row.openingBalance).plus(balances.get(row.id) ?? 0)),
         createdAt: toIso(row.createdAt),
       })),
       total,
@@ -267,7 +272,11 @@ export class ContactsService {
 
   async remove(type: ContactType, id: string): Promise<void> {
     const contact = await this.find(type, id);
-    const transactions = await this.prisma.quote.count({ where: { customerId: id } });
+    const [quotes, invoices] = await Promise.all([
+      this.prisma.quote.count({ where: { customerId: id } }),
+      this.prisma.invoice.count({ where: { customerId: id } }),
+    ]);
+    const transactions = quotes + invoices;
     if (transactions > 0) {
       throw conflict(
         'CONTACT_HAS_TRANSACTIONS',
@@ -285,12 +294,27 @@ export class ContactsService {
 
   async summary(type: ContactType, id: string): Promise<ContactSummaryDto> {
     const contact = await this.find(type, id);
-    return { outstandingReceivables: money(contact.openingBalance), unusedCredits: '0.00' };
+    const balances = type === 'customer' ? await this.invoiceBalances([id]) : new Map<string, Decimal>();
+    return {
+      outstandingReceivables: money(toDecimal(contact.openingBalance).plus(balances.get(id) ?? 0)),
+      unusedCredits: '0.00',
+    };
   }
 
   async history(type: ContactType, id: string): Promise<AuditLogDto[]> {
     await this.find(type, id);
     return this.audit.history(type, id);
+  }
+
+  /** What each customer still owes on sent invoices (drafts and void invoices are not owed). */
+  private async invoiceBalances(customerIds: string[]): Promise<Map<string, Decimal>> {
+    if (customerIds.length === 0) return new Map();
+    const rows = await this.prisma.invoice.groupBy({
+      by: ['customerId'],
+      where: { customerId: { in: customerIds }, status: 'sent' },
+      _sum: { balanceDue: true },
+    });
+    return new Map(rows.map((row) => [row.customerId, toDecimal(row._sum.balanceDue)]));
   }
 
   private async find(type: ContactType, id: string): Promise<ContactWithRelations> {

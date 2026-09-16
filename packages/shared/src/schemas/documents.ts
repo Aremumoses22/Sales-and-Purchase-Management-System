@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { DISCOUNT_TYPES } from '../constants.js';
 import { toDecimal } from '../money.js';
-import { QUOTE_DISPLAY_STATUSES } from '../statuses.js';
+import { INVOICE_DISPLAY_STATUSES, QUOTE_DISPLAY_STATUSES } from '../statuses.js';
 import { lineGross } from '../totals.js';
 import {
   dateSchema,
@@ -80,3 +80,33 @@ export const quoteListQuerySchema = paginationQuerySchema.extend({
   dateTo: dateSchema.optional(),
 });
 export type QuoteListQuery = z.output<typeof quoteListQuerySchema>;
+
+export const invoiceSchema = z
+  .object({
+    customerId: idSchema,
+    invoiceDate: dateSchema,
+    dueDate: dateSchema,
+    paymentTermId: optionalIdSchema,
+    orderNumber: optionalText(50),
+    subject: optionalText(250),
+    ...documentFields,
+    /** "sent" saves and marks a draft as sent in one step. */
+    saveAs: z.enum(['draft', 'sent']).default('draft'),
+  })
+  .refine((data) => data.dueDate >= data.invoiceDate, {
+    message: 'Due date cannot be before the invoice date',
+    path: ['dueDate'],
+  });
+export type InvoiceInput = z.input<typeof invoiceSchema>;
+export type InvoiceOutput = z.output<typeof invoiceSchema>;
+
+export const invoiceListQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(['all', ...INVOICE_DISPLAY_STATUSES]).default('all'),
+  customerId: z.uuid().optional(),
+  dateFrom: dateSchema.optional(),
+  dateTo: dateSchema.optional(),
+});
+export type InvoiceListQuery = z.output<typeof invoiceListQuerySchema>;
+
+export const voidInvoiceSchema = z.object({ reason: optionalText(500) });
+export type VoidInvoiceInput = z.input<typeof voidInvoiceSchema>;

@@ -2,6 +2,7 @@
 
 import type {
   AuditLogDto,
+  InvoiceDto,
   Paginated,
   QuoteDto,
   QuoteInput,
@@ -67,6 +68,17 @@ export function useQuoteTransition() {
     mutationFn: ({ id, action }: { id: string; action: QuoteTransition }) =>
       api.post<QuoteDto>(`/quotes/${id}/${action}`),
     onSuccess: () => invalidate(),
+  });
+}
+
+export function useConvertQuote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<InvoiceDto>(`/quotes/${id}/convert-to-invoice`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: quotesKey });
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
   });
 }
 
