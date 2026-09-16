@@ -36,6 +36,7 @@ model User {
   creditRefundsCreated     CreditNoteRefund[]        @relation("CreditRefundCreatedBy")
   salesReceiptsCreated     SalesReceipt[]            @relation("SalesReceiptCreatedBy")
   recurringInvoicesCreated RecurringInvoiceProfile[] @relation("RecurringInvoiceCreatedBy")
+  expensesCreated          Expense[]                 @relation("ExpenseCreatedBy")
 
   @@map("users")
 }
@@ -164,6 +165,7 @@ model Tax {
   creditNoteLines       CreditNoteLine[]
   salesReceiptLines     SalesReceiptLine[]
   recurringInvoiceLines RecurringInvoiceLine[]
+  expenses              Expense[]
 
   @@map("taxes")
 }
@@ -180,6 +182,7 @@ model PaymentMode {
   paymentRefunds   PaymentRefund[]
   creditRefunds    CreditNoteRefund[]
   salesReceipts    SalesReceipt[]
+  expenses         Expense[]
 
   @@map("payment_modes")
 }
@@ -191,6 +194,8 @@ model ExpenseCategory {
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+
+  expenses Expense[]
 
   @@map("expense_categories")
 }
@@ -244,6 +249,7 @@ model Contact {
   creditNotes       CreditNote[]
   salesReceipts     SalesReceipt[]
   recurringInvoices RecurringInvoiceProfile[]
+  expenses          Expense[]
   preferredForItems Item[]                    @relation("ItemPreferredVendor")
 
   @@index([type, isActive, displayName])
@@ -851,4 +857,44 @@ model RecurringInvoiceLine {
   @@index([profileId])
   @@index([itemId])
   @@map("recurring_invoice_lines")
+}
+
+// ─────────────────────────────── Purchases: Expenses ───────────────────────────────
+
+/// Money already spent. The amount entered may include tax; subtotal, tax and total are stored.
+model Expense {
+  id                   String          @id @default(uuid(7)) @db.Uuid
+  expenseDate          DateTime        @map("expense_date") @db.Date
+  categoryId           String          @map("category_id") @db.Uuid
+  category             ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  vendorId             String?         @map("vendor_id") @db.Uuid
+  vendor               Contact?        @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  /// "Paid through".
+  paymentModeId        String?         @map("payment_mode_id") @db.Uuid
+  paymentMode          PaymentMode?    @relation(fields: [paymentModeId], references: [id], onDelete: Restrict)
+  referenceNumber      String?         @map("reference_number")
+  notes                String?
+  amount               Decimal         @db.Decimal(18, 2)
+  amountIsTaxInclusive Boolean         @default(false) @map("amount_is_tax_inclusive")
+  taxId                String?         @map("tax_id") @db.Uuid
+  tax                  Tax?            @relation(fields: [taxId], references: [id], onDelete: Restrict)
+  taxName              String?         @map("tax_name")
+  taxRate              Decimal?        @map("tax_rate") @db.Decimal(6, 3)
+  subtotal             Decimal         @db.Decimal(18, 2)
+  taxAmount            Decimal         @map("tax_amount") @db.Decimal(18, 2)
+  total                Decimal         @db.Decimal(18, 2)
+  receiptFile          String?         @map("receipt_file")
+  receiptName          String?         @map("receipt_name")
+  receiptMimeType      String?         @map("receipt_mime_type")
+  receiptSize          Int?            @map("receipt_size")
+  createdById          String?         @map("created_by_id") @db.Uuid
+  createdBy            User?           @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+
+  @@index([expenseDate])
+  @@index([categoryId])
+  @@index([vendorId])
+  @@index([paymentModeId])
+  @@map("expenses")
 }

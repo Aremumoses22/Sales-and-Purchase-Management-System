@@ -320,7 +320,7 @@ export class ContactsService {
             this.prisma.salesReceipt.count({ where: { customerId: id } }),
             this.prisma.recurringInvoiceProfile.count({ where: { customerId: id } }),
           ])
-        : await Promise.all([Promise.resolve(0)]);
+        : await Promise.all([this.prisma.expense.count({ where: { vendorId: id } })]);
     return counts.reduce((sum, count) => sum + count, 0);
   }
 

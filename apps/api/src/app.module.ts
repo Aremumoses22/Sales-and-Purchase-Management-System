@@ -6,6 +6,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { AuthGuard, CsrfGuard, PermissionsGuard } from './modules/auth/guards.js';
 import { ContactsModule } from './modules/contacts/contacts.module.js';
 import { DocumentsModule } from './modules/documents/documents.module.js';
+import { ExpensesModule } from './modules/expenses/expenses.module.js';
 import { HealthController } from './modules/health/health.controller.js';
 import { InvoicesModule } from './modules/invoices/invoices.module.js';
 import { ItemsModule } from './modules/items/items.module.js';
@@ -36,6 +37,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     CreditNotesModule,
     SalesReceiptsModule,
     RecurringInvoicesModule,
+    ExpensesModule,
   ],
   controllers: [HealthController, SearchController],
   providers: [

@@ -54,15 +54,16 @@ export class TaxesService extends LookupService<Tax, TaxDto, z.output<typeof tax
   }
 
   protected override async usageCount(id: string): Promise<number> {
-    const [items, quoteLines, invoiceLines, creditNoteLines, salesReceiptLines, recurringLines] = await Promise.all([
+    const [items, quoteLines, invoiceLines, creditNoteLines, salesReceiptLines, recurringLines, expenses] = await Promise.all([
       this.prisma.item.count({ where: { taxId: id } }),
       this.prisma.quoteLine.count({ where: { taxId: id } }),
       this.prisma.invoiceLine.count({ where: { taxId: id } }),
       this.prisma.creditNoteLine.count({ where: { taxId: id } }),
       this.prisma.salesReceiptLine.count({ where: { taxId: id } }),
       this.prisma.recurringInvoiceLine.count({ where: { taxId: id } }),
+      this.prisma.expense.count({ where: { taxId: id } }),
     ]);
-    return items + quoteLines + invoiceLines + creditNoteLines + salesReceiptLines + recurringLines;
+    return items + quoteLines + invoiceLines + creditNoteLines + salesReceiptLines + recurringLines + expenses;
   }
 }
 
@@ -81,13 +82,14 @@ export class PaymentModesService extends LookupService<PaymentMode, PaymentModeD
   }
 
   protected override async usageCount(id: string): Promise<number> {
-    const [payments, refunds, creditRefunds, salesReceipts] = await Promise.all([
+    const [payments, refunds, creditRefunds, salesReceipts, expenses] = await Promise.all([
       this.prisma.paymentReceived.count({ where: { paymentModeId: id } }),
       this.prisma.paymentRefund.count({ where: { paymentModeId: id } }),
       this.prisma.creditNoteRefund.count({ where: { paymentModeId: id } }),
       this.prisma.salesReceipt.count({ where: { paymentModeId: id } }),
+      this.prisma.expense.count({ where: { paymentModeId: id } }),
     ]);
-    return payments + refunds + creditRefunds + salesReceipts;
+    return payments + refunds + creditRefunds + salesReceipts + expenses;
   }
 }
 
@@ -107,5 +109,9 @@ export class ExpenseCategoriesService extends LookupService<
 
   protected toDto(row: ExpenseCategory): ExpenseCategoryDto {
     return { id: row.id, name: row.name, description: row.description, isActive: row.isActive };
+  }
+
+  protected override usageCount(id: string): Promise<number> {
+    return this.prisma.expense.count({ where: { categoryId: id } });
   }
 }

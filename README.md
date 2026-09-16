@@ -17,7 +17,8 @@ A web app for managing customers, items, quotes, invoices, payments, vendors and
 | 8 Sales Receipts | Sales paid on the spot with payment mode and reference, stock updates, drafts, void, clone, print/PDF; never counted as owed | Done |
 | 9 Recurring Invoices | Profiles that create invoices every N days, weeks, months or years (month-end safe), hourly idempotent job, stop/resume, end dates, create invoice now | Done |
 | 10 Vendors | Vendors with contacts, addresses and payables, shared with the customer screens; preferred vendor on items | Done |
-| 11–14 | Expenses, bills, dashboard, reports | Planned |
+| 11 Expenses | Expenses by category with tax (inclusive or exclusive), paid-through, vendor, receipt upload and preview, filters with totals | Done |
+| 11b–14 | Bills and payments made, dashboard, reports | Planned |
 
 ## Stack
 

@@ -583,3 +583,37 @@ export interface RecurringRunResultDto {
   created: { profileId: string; invoiceId: string; number: string; periodDate: string }[];
   failed: { profileId: string; error: string }[];
 }
+
+// ---------- Expenses ----------
+
+export interface ExpenseListItemDto {
+  id: string;
+  expenseDate: string;
+  category: NamedRef;
+  vendor: { id: string; displayName: string } | null;
+  paymentMode: NamedRef | null;
+  referenceNumber: string | null;
+  subtotal: string;
+  taxAmount: string;
+  total: string;
+  hasReceipt: boolean;
+}
+
+export interface ExpenseDto extends ExpenseListItemDto {
+  amount: string;
+  amountIsTaxInclusive: boolean;
+  tax: { id: string; name: string; rate: string } | null;
+  notes: string | null;
+  receipt: { name: string; mimeType: string; size: number } | null;
+  createdBy: NamedRef | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Sums over every expense matching a list's filters, not just the page shown. */
+export interface ExpenseTotalsDto {
+  count: number;
+  subtotal: string;
+  taxTotal: string;
+  total: string;
+}

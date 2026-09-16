@@ -13,7 +13,7 @@ import { ArrowDownIcon, ArrowUpIcon, ChevronLeftIcon, ChevronRightIcon, Loader2I
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -36,6 +36,8 @@ export interface DataTableProps<T> {
   onPageChange?: (page: number) => void;
   rowHref?: (row: T) => string;
   rowKey: (row: T) => string;
+  /** A totals row under the data, keyed by column id; columns without an entry stay blank. */
+  totals?: Partial<Record<string, ReactNode>>;
 }
 
 export function DataTable<T>({
@@ -49,6 +51,7 @@ export function DataTable<T>({
   onPageChange,
   rowHref,
   rowKey,
+  totals,
 }: DataTableProps<T>) {
   const router = useRouter();
   const rows = data ?? [];
@@ -139,6 +142,20 @@ export function DataTable<T>({
               ))
             )}
           </TableBody>
+          {totals && !isLoading && rows.length > 0 ? (
+            <TableFooter>
+              <TableRow className="bg-muted/40 font-semibold hover:bg-muted/40">
+                {table.getVisibleLeafColumns().map((column) => (
+                  <TableCell
+                    key={column.id}
+                    className={cn('py-2.5', column.columnDef.meta?.align === 'right' && 'text-right', column.columnDef.meta?.className)}
+                  >
+                    {totals[column.id] ?? null}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableFooter>
+          ) : null}
         </Table>
       </div>
 

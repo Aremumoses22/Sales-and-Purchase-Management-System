@@ -15,7 +15,9 @@ import { documentLineSchema, invoiceSchema, quoteSchema } from './schemas/docume
 import { itemSchema } from './schemas/items.js';
 import { applyCreditNoteSchema } from './schemas/credit-notes.js';
 import { paymentReceivedSchema } from './schemas/payments.js';
+import { expenseSchema } from './schemas/expenses.js';
 import { recurringInvoiceSchema } from './schemas/recurring-invoices.js';
+import { calculateExpenseAmounts } from './totals.js';
 import { salesReceiptSchema } from './schemas/sales-receipts.js';
 import {
   canPerformCreditNoteAction,
@@ -320,5 +322,30 @@ describe('recurring schedules', () => {
     expect(parsed).toMatchObject({ repeatEvery: 1, endDate: null, createAs: 'draft' });
     expect(recurringInvoiceSchema.safeParse({ ...base, endDate: '2026-09-30' }).success).toBe(false);
     expect(recurringInvoiceSchema.safeParse({ ...base, repeatEvery: '0' }).success).toBe(false);
+  });
+});
+
+describe('expenses', () => {
+  it('adds tax on top of an exclusive amount and takes it out of an inclusive one', () => {
+    expect(calculateExpenseAmounts({ amount: '10000', taxRate: '7.5' })).toEqual({ subtotal: '10000.00', taxAmount: '750.00', total: '10750.00' });
+    expect(calculateExpenseAmounts({ amount: '10750', taxRate: '7.5', amountIsTaxInclusive: true })).toEqual({
+      subtotal: '10000.00',
+      taxAmount: '750.00',
+      total: '10750.00',
+    });
+    // Rounding stays within the amount paid.
+    expect(calculateExpenseAmounts({ amount: '100', taxRate: '7.5', amountIsTaxInclusive: true })).toEqual({
+      subtotal: '93.02',
+      taxAmount: '6.98',
+      total: '100.00',
+    });
+    expect(calculateExpenseAmounts({ amount: '99.999' })).toEqual({ subtotal: '100.00', taxAmount: '0.00', total: '100.00' });
+  });
+
+  it('requires a category and a positive amount', () => {
+    const base = { expenseDate: '2026-09-16', categoryId: '0199b5a0-0000-7000-8000-000000000001', amount: '2500' };
+    expect(expenseSchema.parse(base)).toMatchObject({ amountIsTaxInclusive: false, taxId: null, vendorId: null });
+    expect(expenseSchema.safeParse({ ...base, amount: '0' }).success).toBe(false);
+    expect(expenseSchema.safeParse({ ...base, categoryId: '' }).success).toBe(false);
   });
 });

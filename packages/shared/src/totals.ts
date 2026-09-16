@@ -131,3 +131,32 @@ export function calculateDocumentTotals(input: DocumentTotalsInput): DocumentTot
     total: total.toFixed(2),
   };
 }
+
+export interface ExpenseAmounts {
+  subtotal: string;
+  taxAmount: string;
+  total: string;
+}
+
+/**
+ * Splits an expense amount into subtotal and tax. A tax-inclusive amount is the total paid, so the
+ * tax is taken out of it; otherwise the tax is added on top.
+ */
+export function calculateExpenseAmounts(input: {
+  amount: NumericInput;
+  taxRate?: NumericInput;
+  amountIsTaxInclusive?: boolean;
+}): ExpenseAmounts {
+  const amount = roundMoney(input.amount);
+  const rate = toDecimal(input.taxRate);
+  if (rate.lte(0)) {
+    const value = amount.toFixed(2);
+    return { subtotal: value, taxAmount: '0.00', total: value };
+  }
+  if (input.amountIsTaxInclusive) {
+    const subtotal = roundMoney(amount.div(rate.div(100).plus(1)));
+    return { subtotal: subtotal.toFixed(2), taxAmount: amount.minus(subtotal).toFixed(2), total: amount.toFixed(2) };
+  }
+  const taxAmount = roundMoney(amount.times(rate).div(100));
+  return { subtotal: amount.toFixed(2), taxAmount: taxAmount.toFixed(2), total: amount.plus(taxAmount).toFixed(2) };
+}
