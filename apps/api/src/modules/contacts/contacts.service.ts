@@ -272,13 +272,14 @@ export class ContactsService {
 
   async remove(type: ContactType, id: string): Promise<void> {
     const contact = await this.find(type, id);
-    const [quotes, invoices, payments, creditNotes] = await Promise.all([
+    const [quotes, invoices, payments, creditNotes, salesReceipts] = await Promise.all([
       this.prisma.quote.count({ where: { customerId: id } }),
       this.prisma.invoice.count({ where: { customerId: id } }),
       this.prisma.paymentReceived.count({ where: { customerId: id } }),
       this.prisma.creditNote.count({ where: { customerId: id } }),
+      this.prisma.salesReceipt.count({ where: { customerId: id } }),
     ]);
-    const transactions = quotes + invoices + payments + creditNotes;
+    const transactions = quotes + invoices + payments + creditNotes + salesReceipts;
     if (transactions > 0) {
       throw conflict(
         'CONTACT_HAS_TRANSACTIONS',

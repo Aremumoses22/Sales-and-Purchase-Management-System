@@ -50,6 +50,7 @@ export const STATUS_LABELS: Record<string, string> = {
   paid: 'Paid',
   void: 'Void',
   open: 'Open',
+  completed: 'Completed',
   closed: 'Closed',
   active: 'Active',
   inactive: 'Inactive',
@@ -141,4 +142,23 @@ export function canPerformCreditNoteAction(action: CreditNoteAction, creditNote:
     case 'refund':
       return creditNote.status === 'open' && toDecimal(creditNote.balance).gt(0);
   }
+}
+
+// ---------- Sales receipts ----------
+
+/** A receipt records a sale that was paid on the spot, so it never has a balance or a derived status. */
+export const SALES_RECEIPT_STATUSES = ['draft', 'completed', 'void'] as const;
+export type SalesReceiptStatus = (typeof SALES_RECEIPT_STATUSES)[number];
+
+export type SalesReceiptAction = 'edit' | 'delete' | 'complete' | 'void';
+
+const SALES_RECEIPT_ACTION_RULES: Record<SalesReceiptAction, readonly SalesReceiptStatus[]> = {
+  edit: ['draft', 'completed'],
+  delete: ['draft'],
+  complete: ['draft'],
+  void: ['completed'],
+};
+
+export function canPerformSalesReceiptAction(action: SalesReceiptAction, status: SalesReceiptStatus): boolean {
+  return SALES_RECEIPT_ACTION_RULES[action].includes(status);
 }

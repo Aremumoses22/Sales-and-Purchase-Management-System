@@ -14,6 +14,7 @@ import type {
   InvoiceStatus,
   QuoteDisplayStatus,
   QuoteStatus,
+  SalesReceiptStatus,
 } from './statuses.js';
 import type { TaxBreakdownEntry } from './totals.js';
 
@@ -323,6 +324,7 @@ export interface SearchResultsDto {
   quotes: { id: string; number: string; customerName: string }[];
   invoices: { id: string; number: string; customerName: string }[];
   creditNotes: { id: string; number: string; customerName: string }[];
+  salesReceipts: { id: string; number: string; customerName: string }[];
 }
 
 export interface InvoiceListItemDto {
@@ -485,6 +487,38 @@ export interface CreditNoteDto extends Omit<CreditNoteListItemDto, 'customer'> {
   applications: CreditApplicationDto[];
   refunds: PaymentRefundDto[];
   openedAt: string | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+  createdBy: NamedRef | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------- Sales receipts ----------
+
+export interface SalesReceiptListItemDto {
+  id: string;
+  number: string;
+  receiptDate: string;
+  referenceNumber: string | null;
+  paymentMode: NamedRef | null;
+  status: SalesReceiptStatus;
+  total: string;
+  customer: { id: string; displayName: string };
+}
+
+export interface SalesReceiptDto extends Omit<SalesReceiptListItemDto, 'customer'> {
+  subtotal: string;
+  discountTotal: string;
+  taxTotal: string;
+  taxBreakdown: TaxBreakdownEntry[];
+  shippingCharge: string;
+  adjustment: string;
+  customerNotes: string | null;
+  terms: string | null;
+  lines: DocumentLineDto[];
+  customer: DocumentCustomerDto;
+  completedAt: string | null;
   voidedAt: string | null;
   voidReason: string | null;
   createdBy: NamedRef | null;

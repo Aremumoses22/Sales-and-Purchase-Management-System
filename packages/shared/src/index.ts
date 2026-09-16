@@ -13,3 +13,4 @@ export * from './schemas/items.js';
 export * from './schemas/documents.js';
 export * from './schemas/payments.js';
 export * from './schemas/credit-notes.js';
+export * from './schemas/sales-receipts.js';

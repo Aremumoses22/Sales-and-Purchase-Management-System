@@ -3,6 +3,7 @@
 import type {
   AddressDto,
   CreditNoteListItemDto,
+  SalesReceiptListItemDto,
   InvoiceListItemDto,
   PaymentReceivedListItemDto,
   QuoteListItemDto,
@@ -20,6 +21,7 @@ import {
   PhoneIcon,
   PlusIcon,
   ReceiptIcon,
+  ScrollTextIcon,
   WalletIcon,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -53,6 +55,7 @@ import { useCreditNotes } from '@/features/credit-notes/api';
 import { useInvoices } from '@/features/invoices/api';
 import { usePayments } from '@/features/payments/api';
 import { useQuotes } from '@/features/quotes/api';
+import { useSalesReceipts } from '@/features/sales-receipts/api';
 import { addressLines } from '@/lib/address';
 import { formatDate } from '@/lib/format';
 import { showApiError } from '@/lib/forms';
@@ -153,6 +156,45 @@ function CustomerPayments({ customerId }: { customerId: string }) {
         rowKey={(row) => row.id}
         rowHref={(row) => `/payments-received/${row.id}`}
         empty={<EmptyState icon={<BanknoteArrowDownIcon className="size-7" />} title="No payments from this customer yet" />}
+      />
+    </div>
+  );
+}
+
+function CustomerSalesReceipts({ customerId }: { customerId: string }) {
+  const organization = useOrganization();
+  const can = useCan();
+  const { data, isPending } = useSalesReceipts({ customerId, pageSize: 10, status: 'all', sort: '-date' }, can('sales_receipts:view'));
+
+  const columns: ColumnDef<SalesReceiptListItemDto, unknown>[] = [
+    { id: 'date', header: 'Date', cell: ({ row }) => formatDate(row.original.receiptDate, organization) },
+    { id: 'number', header: 'Receipt#', cell: ({ row }) => <span className="font-medium text-primary">{row.original.number}</span> },
+    { id: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.status} /> },
+    { id: 'mode', header: 'Payment mode', cell: ({ row }) => <span className="text-muted-foreground">{row.original.paymentMode?.name ?? '—'}</span> },
+    { id: 'total', header: 'Amount', meta: { align: 'right' }, cell: ({ row }) => <Money value={row.original.total} /> },
+  ];
+
+  if (!can('sales_receipts:view')) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Sales receipts</h3>
+        {can('sales_receipts:create') ? (
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/sales-receipts/new?customerId=${customerId}`} />}>
+            <PlusIcon />
+            New sales receipt
+          </Button>
+        ) : null}
+      </div>
+      <DataTable
+        columns={columns}
+        data={data?.data}
+        meta={data?.meta}
+        isLoading={isPending}
+        rowKey={(row) => row.id}
+        rowHref={(row) => `/sales-receipts/${row.id}`}
+        empty={<EmptyState icon={<ScrollTextIcon className="size-7" />} title="No sales receipts for this customer yet" />}
       />
     </div>
   );
@@ -322,7 +364,7 @@ export default function CustomerDetailPage() {
               Edit
             </Button>
           ) : null}
-          {customer.isActive && (can('invoices:create') || can('quotes:create') || can('payments_received:create') || can('credit_notes:create')) ? (
+          {customer.isActive && (can('invoices:create') || can('quotes:create') || can('payments_received:create') || can('credit_notes:create') || can('sales_receipts:create')) ? (
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button />}>
                 <PlusIcon />
@@ -335,6 +377,9 @@ export default function CustomerDetailPage() {
                 ) : null}
                 {can('quotes:create') ? (
                   <DropdownMenuItem render={<Link href={`/quotes/new?customerId=${id}`} />}>Quote</DropdownMenuItem>
+                ) : null}
+                {can('sales_receipts:create') ? (
+                  <DropdownMenuItem render={<Link href={`/sales-receipts/new?customerId=${id}`} />}>Sales receipt</DropdownMenuItem>
                 ) : null}
                 {can('payments_received:create') ? (
                   <DropdownMenuItem render={<Link href={`/payments-received/new?customerId=${id}`} />}>Payment received</DropdownMenuItem>
@@ -483,6 +528,7 @@ export default function CustomerDetailPage() {
             <CustomerInvoices customerId={id} />
             <CustomerPayments customerId={id} />
             <CustomerCreditNotes customerId={id} />
+            <CustomerSalesReceipts customerId={id} />
             <CustomerQuotes customerId={id} />
           </div>
         </TabsContent>

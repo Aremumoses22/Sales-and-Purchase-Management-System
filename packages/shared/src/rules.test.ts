@@ -7,6 +7,7 @@ import { documentLineSchema, invoiceSchema, quoteSchema } from './schemas/docume
 import { itemSchema } from './schemas/items.js';
 import { applyCreditNoteSchema } from './schemas/credit-notes.js';
 import { paymentReceivedSchema } from './schemas/payments.js';
+import { salesReceiptSchema } from './schemas/sales-receipts.js';
 import {
   canPerformCreditNoteAction,
   canPerformInvoiceAction,
@@ -14,6 +15,7 @@ import {
   getCreditNoteDisplayStatus,
   getInvoiceDisplayStatus,
   getQuoteDisplayStatus,
+  canPerformSalesReceiptAction,
 } from './statuses.js';
 
 describe('quote status rules', () => {
@@ -236,5 +238,26 @@ describe('credit note rules', () => {
       }).success,
     ).toBe(false);
     expect(applyCreditNoteSchema.safeParse({ applications: [] }).success).toBe(false);
+  });
+});
+
+describe('sales receipt rules', () => {
+  it('deletes only drafts, voids only completed receipts and locks void ones', () => {
+    expect(canPerformSalesReceiptAction('delete', 'draft')).toBe(true);
+    expect(canPerformSalesReceiptAction('delete', 'completed')).toBe(false);
+    expect(canPerformSalesReceiptAction('void', 'completed')).toBe(true);
+    expect(canPerformSalesReceiptAction('void', 'draft')).toBe(false);
+    expect(canPerformSalesReceiptAction('complete', 'draft')).toBe(true);
+    expect(canPerformSalesReceiptAction('edit', 'void')).toBe(false);
+  });
+
+  it('saves a receipt as completed unless asked to keep a draft', () => {
+    const result = salesReceiptSchema.parse({
+      customerId: '0199b5a0-0000-7000-8000-000000000001',
+      receiptDate: '2026-09-16',
+      lines: [{ name: 'Walk-in sale', quantity: '2', rate: '1500' }],
+    });
+    expect(result.saveAs).toBe('completed');
+    expect(result.paymentModeId).toBeNull();
   });
 });

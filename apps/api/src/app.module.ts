@@ -10,6 +10,7 @@ import { InvoicesModule } from './modules/invoices/invoices.module.js';
 import { ItemsModule } from './modules/items/items.module.js';
 import { CreditNotesModule } from './modules/credit-notes/credit-notes.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
+import { SalesReceiptsModule } from './modules/sales-receipts/sales-receipts.module.js';
 import { QuotesModule } from './modules/quotes/quotes.module.js';
 import { SearchController } from './modules/search/search.controller.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
@@ -30,6 +31,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     InvoicesModule,
     PaymentsModule,
     CreditNotesModule,
+    SalesReceiptsModule,
   ],
   controllers: [HealthController, SearchController],
   providers: [

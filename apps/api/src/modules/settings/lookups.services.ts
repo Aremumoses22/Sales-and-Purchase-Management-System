@@ -53,13 +53,14 @@ export class TaxesService extends LookupService<Tax, TaxDto, z.output<typeof tax
   }
 
   protected override async usageCount(id: string): Promise<number> {
-    const [items, quoteLines, invoiceLines, creditNoteLines] = await Promise.all([
+    const [items, quoteLines, invoiceLines, creditNoteLines, salesReceiptLines] = await Promise.all([
       this.prisma.item.count({ where: { taxId: id } }),
       this.prisma.quoteLine.count({ where: { taxId: id } }),
       this.prisma.invoiceLine.count({ where: { taxId: id } }),
       this.prisma.creditNoteLine.count({ where: { taxId: id } }),
+      this.prisma.salesReceiptLine.count({ where: { taxId: id } }),
     ]);
-    return items + quoteLines + invoiceLines + creditNoteLines;
+    return items + quoteLines + invoiceLines + creditNoteLines + salesReceiptLines;
   }
 }
 
@@ -78,12 +79,13 @@ export class PaymentModesService extends LookupService<PaymentMode, PaymentModeD
   }
 
   protected override async usageCount(id: string): Promise<number> {
-    const [payments, refunds, creditRefunds] = await Promise.all([
+    const [payments, refunds, creditRefunds, salesReceipts] = await Promise.all([
       this.prisma.paymentReceived.count({ where: { paymentModeId: id } }),
       this.prisma.paymentRefund.count({ where: { paymentModeId: id } }),
       this.prisma.creditNoteRefund.count({ where: { paymentModeId: id } }),
+      this.prisma.salesReceipt.count({ where: { paymentModeId: id } }),
     ]);
-    return payments + refunds + creditRefunds;
+    return payments + refunds + creditRefunds + salesReceipts;
   }
 }
 

@@ -34,6 +34,7 @@ model User {
   creditNotesCreated    CreditNote[]        @relation("CreditNoteCreatedBy")
   creditApplications    CreditApplication[] @relation("CreditApplicationCreatedBy")
   creditRefundsCreated  CreditNoteRefund[]  @relation("CreditRefundCreatedBy")
+  salesReceiptsCreated  SalesReceipt[]      @relation("SalesReceiptCreatedBy")
 
   @@map("users")
 }
@@ -155,10 +156,11 @@ model Tax {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  items           Item[]
-  quoteLines      QuoteLine[]
-  invoiceLines    InvoiceLine[]
-  creditNoteLines CreditNoteLine[]
+  items             Item[]
+  quoteLines        QuoteLine[]
+  invoiceLines      InvoiceLine[]
+  creditNoteLines   CreditNoteLine[]
+  salesReceiptLines SalesReceiptLine[]
 
   @@map("taxes")
 }
@@ -174,6 +176,7 @@ model PaymentMode {
   paymentsReceived PaymentReceived[]
   paymentRefunds   PaymentRefund[]
   creditRefunds    CreditNoteRefund[]
+  salesReceipts    SalesReceipt[]
 
   @@map("payment_modes")
 }
@@ -236,6 +239,7 @@ model Contact {
   invoices          Invoice[]
   paymentsReceived  PaymentReceived[]
   creditNotes       CreditNote[]
+  salesReceipts     SalesReceipt[]
   preferredForItems Item[]            @relation("ItemPreferredVendor")
 
   @@index([type, isActive, displayName])
@@ -317,10 +321,11 @@ model Item {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  stockMovements  StockMovement[]
-  quoteLines      QuoteLine[]
-  invoiceLines    InvoiceLine[]
-  creditNoteLines CreditNoteLine[]
+  stockMovements    StockMovement[]
+  quoteLines        QuoteLine[]
+  invoiceLines      InvoiceLine[]
+  creditNoteLines   CreditNoteLine[]
+  salesReceiptLines SalesReceiptLine[]
 
   @@index([isActive, name])
   @@map("items")
@@ -678,4 +683,73 @@ model CreditNoteRefund {
 
   @@index([creditNoteId])
   @@map("credit_note_refunds")
+}
+
+// ─────────────────────────────── Sales: Sales receipts ───────────────────────────────
+
+/// A sale paid on the spot. Completed receipts take stock; none of them are ever owed.
+enum SalesReceiptStatus {
+  draft
+  completed
+  void
+}
+
+model SalesReceipt {
+  id              String             @id @default(uuid(7)) @db.Uuid
+  number          String             @unique
+  customerId      String             @map("customer_id") @db.Uuid
+  customer        Contact            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  receiptDate     DateTime           @map("receipt_date") @db.Date
+  paymentModeId   String?            @map("payment_mode_id") @db.Uuid
+  paymentMode     PaymentMode?       @relation(fields: [paymentModeId], references: [id], onDelete: SetNull)
+  referenceNumber String?            @map("reference_number")
+  status          SalesReceiptStatus @default(draft)
+  subtotal        Decimal            @db.Decimal(18, 2)
+  discountTotal   Decimal            @map("discount_total") @db.Decimal(18, 2)
+  taxTotal        Decimal            @map("tax_total") @db.Decimal(18, 2)
+  shippingCharge  Decimal            @default(0) @map("shipping_charge") @db.Decimal(18, 2)
+  adjustment      Decimal            @default(0) @db.Decimal(18, 2)
+  total           Decimal            @db.Decimal(18, 2)
+  customerNotes   String?            @map("customer_notes")
+  terms           String?
+  completedAt     DateTime?          @map("completed_at")
+  voidedAt        DateTime?          @map("voided_at")
+  voidReason      String?            @map("void_reason")
+  createdById     String?            @map("created_by_id") @db.Uuid
+  createdBy       User?              @relation("SalesReceiptCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  lines SalesReceiptLine[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([receiptDate])
+  @@map("sales_receipts")
+}
+
+model SalesReceiptLine {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  salesReceiptId String       @map("sales_receipt_id") @db.Uuid
+  salesReceipt   SalesReceipt @relation(fields: [salesReceiptId], references: [id], onDelete: Cascade)
+  position       Int
+  itemId         String?      @map("item_id") @db.Uuid
+  item           Item?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  name           String
+  description    String?
+  quantity       Decimal      @db.Decimal(18, 3)
+  unit           String?
+  rate           Decimal      @db.Decimal(18, 2)
+  discountType   DiscountType @default(percent) @map("discount_type")
+  discountValue  Decimal      @default(0) @map("discount_value") @db.Decimal(18, 2)
+  taxId          String?      @map("tax_id") @db.Uuid
+  tax            Tax?         @relation(fields: [taxId], references: [id], onDelete: SetNull)
+  taxName        String?      @map("tax_name")
+  taxRate        Decimal?     @map("tax_rate") @db.Decimal(6, 3)
+  amount         Decimal      @db.Decimal(18, 2)
+  taxAmount      Decimal      @map("tax_amount") @db.Decimal(18, 2)
+
+  @@index([salesReceiptId])
+  @@index([itemId])
+  @@map("sales_receipt_lines")
 }

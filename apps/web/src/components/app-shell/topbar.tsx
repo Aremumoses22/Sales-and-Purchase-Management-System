@@ -99,6 +99,16 @@ function GlobalSearch() {
               ))}
             </CommandGroup>
           ) : null}
+          {data?.salesReceipts.length ? (
+            <CommandGroup heading="Sales receipts">
+              {data.salesReceipts.map((receipt) => (
+                <CommandItem key={receipt.id} value={`sales-receipt-${receipt.id}`} onSelect={() => go(`/sales-receipts/${receipt.id}`)}>
+                  {receipt.number}
+                  <span className="text-muted-foreground"> · {receipt.customerName}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
           {data?.creditNotes.length ? (
             <CommandGroup heading="Credit notes">
               {data.creditNotes.map((creditNote) => (
@@ -131,6 +141,7 @@ function QuickCreate() {
   const actions = [
     { href: '/invoices/new', label: 'Invoice', permission: 'invoices:create' as const },
     { href: '/quotes/new', label: 'Quote', permission: 'quotes:create' as const },
+    { href: '/sales-receipts/new', label: 'Sales receipt', permission: 'sales_receipts:create' as const },
     { href: '/payments-received/new', label: 'Payment received', permission: 'payments_received:create' as const },
     { href: '/credit-notes/new', label: 'Credit note', permission: 'credit_notes:create' as const },
     { href: '/customers/new', label: 'Customer', permission: 'customers:create' as const },
