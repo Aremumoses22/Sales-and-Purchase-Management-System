@@ -32,7 +32,16 @@ function FieldError({ message }: { message?: string }) {
  * Zoho-style item table. The item cell is a combobox: pick a saved item (fills description,
  * rate, unit and tax) or type anything for a one-off line.
  */
-export function LineItemsEditor({ form, taxes }: { form: UseFormReturn<DocumentBodyValues>; taxes: TaxDto[] | undefined }) {
+export function LineItemsEditor({
+  form,
+  taxes,
+  pricing = 'sales',
+}: {
+  form: UseFormReturn<DocumentBodyValues>;
+  taxes: TaxDto[] | undefined;
+  /** Bills fill in an item's cost price and purchase description instead of its sales details. */
+  pricing?: 'sales' | 'purchase';
+}) {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' });
   const lineErrors = form.formState.errors.lines;
   const activeTaxes = taxes?.filter((tax) => tax.isActive) ?? [];
@@ -40,8 +49,9 @@ export function LineItemsEditor({ form, taxes }: { form: UseFormReturn<DocumentB
   const pickItem = (index: number, item: ItemListItemDto) => {
     form.setValue(`lines.${index}.itemId`, item.id, { shouldDirty: true });
     form.setValue(`lines.${index}.name`, item.name, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
-    form.setValue(`lines.${index}.description`, item.salesDescription ?? '');
-    form.setValue(`lines.${index}.rate`, item.sellingPrice ?? '0');
+    const purchase = pricing === 'purchase';
+    form.setValue(`lines.${index}.description`, (purchase ? item.purchaseDescription : item.salesDescription) ?? '');
+    form.setValue(`lines.${index}.rate`, (purchase ? item.costPrice : item.sellingPrice) ?? '0');
     form.setValue(`lines.${index}.unit`, item.unit);
     form.setValue(`lines.${index}.taxId`, item.taxId);
   };
@@ -82,6 +92,7 @@ export function LineItemsEditor({ form, taxes }: { form: UseFormReturn<DocumentB
                       invalid={Boolean(errors?.name)}
                       onPickItem={(item) => pickItem(index, item)}
                       onUseText={(text) => applyText(index, text)}
+                      pricing={pricing}
                     />
                     <FieldError message={errors?.name?.message ?? errors?.itemId?.message} />
                     <Textarea

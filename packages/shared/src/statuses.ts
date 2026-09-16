@@ -180,3 +180,45 @@ export function getRecurringProfileDisplayStatus(profile: {
   if (profile.status === 'active' && profile.endDate !== null && profile.nextRunDate > profile.endDate) return 'expired';
   return profile.status;
 }
+
+// ---------- Bills ----------
+
+/** Stored lifecycle. Paid, partially paid and overdue are derived from the balance and due date. */
+export const BILL_STATUSES = ['draft', 'open', 'void'] as const;
+export type BillStatus = (typeof BILL_STATUSES)[number];
+
+export const BILL_DISPLAY_STATUSES = ['draft', 'open', 'overdue', 'partially_paid', 'paid', 'void'] as const;
+export type BillDisplayStatus = (typeof BILL_DISPLAY_STATUSES)[number];
+
+export interface BillStatusFacts {
+  status: BillStatus;
+  amountPaid: NumericInput;
+  balanceDue: NumericInput;
+  dueDate: string;
+}
+
+/** Mirrors invoices: an unpaid balance past the due date is overdue even when part is paid. */
+export function getBillDisplayStatus(bill: BillStatusFacts, today: string): BillDisplayStatus {
+  if (bill.status !== 'open') return bill.status;
+  if (!toDecimal(bill.balanceDue).gt(0)) return 'paid';
+  if (bill.dueDate < today) return 'overdue';
+  return toDecimal(bill.amountPaid).gt(0) ? 'partially_paid' : 'open';
+}
+
+export type BillAction = 'edit' | 'delete' | 'markOpen' | 'void' | 'recordPayment';
+
+export function canPerformBillAction(action: BillAction, bill: Omit<BillStatusFacts, 'dueDate'>): boolean {
+  const hasPayments = toDecimal(bill.amountPaid).gt(0);
+  switch (action) {
+    case 'edit':
+      return bill.status !== 'void';
+    case 'delete':
+      return bill.status === 'draft' && !hasPayments;
+    case 'markOpen':
+      return bill.status === 'draft';
+    case 'void':
+      return bill.status === 'open' && !hasPayments;
+    case 'recordPayment':
+      return bill.status !== 'void' && toDecimal(bill.balanceDue).gt(0);
+  }
+}

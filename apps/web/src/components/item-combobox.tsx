@@ -17,6 +17,7 @@ export function ItemCombobox({
   invalid,
   onPickItem,
   onUseText,
+  pricing = 'sales',
 }: {
   label: string | null | undefined;
   /** True when the line is tied to a saved item. */
@@ -24,6 +25,8 @@ export function ItemCombobox({
   invalid?: boolean;
   onPickItem: (item: ItemListItemDto) => void;
   onUseText: (text: string) => void;
+  /** Which price to show: selling price on sales documents, cost price on bills. */
+  pricing?: 'sales' | 'purchase';
 }) {
   const organization = useOrganization();
   const can = useCan();
@@ -98,8 +101,10 @@ export function ItemCombobox({
                             .join(' · ') || (item.type === 'service' ? 'Service' : 'Goods')}
                         </p>
                       </div>
-                      {item.sellingPrice !== null ? (
-                        <span className="shrink-0 text-xs tabular-nums">{formatMoney(item.sellingPrice, organization)}</span>
+                      {(pricing === 'sales' ? item.sellingPrice : item.costPrice) !== null ? (
+                        <span className="shrink-0 text-xs tabular-nums">
+                          {formatMoney((pricing === 'sales' ? item.sellingPrice : item.costPrice) ?? '0', organization)}
+                        </span>
                       ) : null}
                     </div>
                   </CommandItem>

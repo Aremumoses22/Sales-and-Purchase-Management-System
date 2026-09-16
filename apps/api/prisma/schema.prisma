@@ -37,6 +37,8 @@ model User {
   salesReceiptsCreated     SalesReceipt[]            @relation("SalesReceiptCreatedBy")
   recurringInvoicesCreated RecurringInvoiceProfile[] @relation("RecurringInvoiceCreatedBy")
   expensesCreated          Expense[]                 @relation("ExpenseCreatedBy")
+  billsCreated             Bill[]                    @relation("BillCreatedBy")
+  paymentsMadeCreated      PaymentMade[]             @relation("PaymentMadeCreatedBy")
 
   @@map("users")
 }
@@ -148,6 +150,8 @@ model PaymentTerm {
   invoices          Invoice[]
   recurringInvoices RecurringInvoiceProfile[]
 
+  bills Bill[]
+
   @@map("payment_terms")
 }
 
@@ -167,6 +171,8 @@ model Tax {
   recurringInvoiceLines RecurringInvoiceLine[]
   expenses              Expense[]
 
+  billLines BillLine[]
+
   @@map("taxes")
 }
 
@@ -183,6 +189,8 @@ model PaymentMode {
   creditRefunds    CreditNoteRefund[]
   salesReceipts    SalesReceipt[]
   expenses         Expense[]
+
+  paymentsMade PaymentMade[]
 
   @@map("payment_modes")
 }
@@ -251,6 +259,9 @@ model Contact {
   recurringInvoices RecurringInvoiceProfile[]
   expenses          Expense[]
   preferredForItems Item[]                    @relation("ItemPreferredVendor")
+
+  bills        Bill[]
+  paymentsMade PaymentMade[]
 
   @@index([type, isActive, displayName])
   @@map("contacts")
@@ -337,6 +348,8 @@ model Item {
   creditNoteLines       CreditNoteLine[]
   salesReceiptLines     SalesReceiptLine[]
   recurringInvoiceLines RecurringInvoiceLine[]
+
+  billLines BillLine[]
 
   @@index([isActive, name])
   @@map("items")
@@ -897,4 +910,117 @@ model Expense {
   @@index([vendorId])
   @@index([paymentModeId])
   @@map("expenses")
+}
+
+// ─────────────────────────────── Purchases: Bills and payments made ───────────────────────────────
+
+/// Stored lifecycle. Paid, partially paid and overdue are derived from the balance and due date.
+enum BillStatus {
+  draft
+  open
+  void
+}
+
+/// What the business owes a vendor. The number is the vendor's own invoice number.
+model Bill {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  billNumber     String       @map("bill_number")
+  vendorId       String       @map("vendor_id") @db.Uuid
+  vendor         Contact      @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  orderNumber    String?      @map("order_number")
+  billDate       DateTime     @map("bill_date") @db.Date
+  dueDate        DateTime     @map("due_date") @db.Date
+  paymentTermId  String?      @map("payment_term_id") @db.Uuid
+  paymentTerm    PaymentTerm? @relation(fields: [paymentTermId], references: [id], onDelete: SetNull)
+  status         BillStatus   @default(draft)
+  subtotal       Decimal      @db.Decimal(18, 2)
+  discountTotal  Decimal      @map("discount_total") @db.Decimal(18, 2)
+  taxTotal       Decimal      @map("tax_total") @db.Decimal(18, 2)
+  shippingCharge Decimal      @default(0) @map("shipping_charge") @db.Decimal(18, 2)
+  adjustment     Decimal      @default(0) @db.Decimal(18, 2)
+  total          Decimal      @db.Decimal(18, 2)
+  amountPaid     Decimal      @default(0) @map("amount_paid") @db.Decimal(18, 2)
+  balanceDue     Decimal      @map("balance_due") @db.Decimal(18, 2)
+  notes          String?
+  terms          String?
+  openedAt       DateTime?    @map("opened_at")
+  voidedAt       DateTime?    @map("voided_at")
+  voidReason     String?      @map("void_reason")
+  createdById    String?      @map("created_by_id") @db.Uuid
+  createdBy      User?        @relation("BillCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  lines       BillLine[]
+  allocations BillPaymentAllocation[]
+
+  @@unique([vendorId, billNumber])
+  @@index([status, dueDate])
+  @@index([billDate])
+  @@map("bills")
+}
+
+model BillLine {
+  id            String       @id @default(uuid(7)) @db.Uuid
+  billId        String       @map("bill_id") @db.Uuid
+  bill          Bill         @relation(fields: [billId], references: [id], onDelete: Cascade)
+  position      Int
+  itemId        String?      @map("item_id") @db.Uuid
+  item          Item?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  name          String
+  description   String?
+  quantity      Decimal      @db.Decimal(18, 3)
+  unit          String?
+  rate          Decimal      @db.Decimal(18, 2)
+  discountType  DiscountType @default(percent) @map("discount_type")
+  discountValue Decimal      @default(0) @map("discount_value") @db.Decimal(18, 2)
+  taxId         String?      @map("tax_id") @db.Uuid
+  tax           Tax?         @relation(fields: [taxId], references: [id], onDelete: SetNull)
+  taxName       String?      @map("tax_name")
+  taxRate       Decimal?     @map("tax_rate") @db.Decimal(6, 3)
+  amount        Decimal      @db.Decimal(18, 2)
+  taxAmount     Decimal      @map("tax_amount") @db.Decimal(18, 2)
+
+  @@index([billId])
+  @@index([itemId])
+  @@map("bill_lines")
+}
+
+model PaymentMade {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  number          String       @unique
+  vendorId        String       @map("vendor_id") @db.Uuid
+  vendor          Contact      @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  paymentDate     DateTime     @map("payment_date") @db.Date
+  amount          Decimal      @db.Decimal(18, 2)
+  paymentModeId   String?      @map("payment_mode_id") @db.Uuid
+  paymentMode     PaymentMode? @relation(fields: [paymentModeId], references: [id], onDelete: SetNull)
+  referenceNumber String?      @map("reference_number")
+  notes           String?
+  /// Sum of allocations; the unused amount is amount - applied.
+  amountApplied   Decimal      @default(0) @map("amount_applied") @db.Decimal(18, 2)
+  createdById     String?      @map("created_by_id") @db.Uuid
+  createdBy       User?        @relation("PaymentMadeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  allocations BillPaymentAllocation[]
+
+  @@index([vendorId])
+  @@index([paymentDate])
+  @@map("payments_made")
+}
+
+model BillPaymentAllocation {
+  id        String      @id @default(uuid(7)) @db.Uuid
+  paymentId String      @map("payment_id") @db.Uuid
+  payment   PaymentMade @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  billId    String      @map("bill_id") @db.Uuid
+  bill      Bill        @relation(fields: [billId], references: [id], onDelete: Restrict)
+  amount    Decimal     @db.Decimal(18, 2)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@unique([paymentId, billId])
+  @@index([billId])
+  @@map("bill_payment_allocations")
 }

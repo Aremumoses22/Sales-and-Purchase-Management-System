@@ -4,7 +4,7 @@ import { getRequestContext } from '../../common/request-context.js';
 import type { Tx } from '../../prisma/prisma.service.js';
 
 export interface StockSource {
-  type: 'invoice' | 'sales_receipt' | 'credit_note';
+  type: 'invoice' | 'sales_receipt' | 'credit_note' | 'bill';
   id: string;
   date: Date;
   /** -1 when goods leave (sales), +1 when they come back (returns). */

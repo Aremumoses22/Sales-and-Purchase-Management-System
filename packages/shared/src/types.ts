@@ -9,6 +9,8 @@ import type {
 import type { RecurrenceUnit } from './dates.js';
 import type { Permission } from './permissions.js';
 import type {
+  BillDisplayStatus,
+  BillStatus,
   CreditNoteDisplayStatus,
   CreditNoteStatus,
   InvoiceDisplayStatus,
@@ -236,6 +238,7 @@ export interface ItemListItemDto {
   sellingPrice: string | null;
   salesDescription: string | null;
   costPrice: string | null;
+  purchaseDescription: string | null;
   taxId: string | null;
   trackInventory: boolean;
   stockOnHand: string | null;
@@ -244,7 +247,6 @@ export interface ItemListItemDto {
 }
 
 export interface ItemDto extends ItemListItemDto {
-  purchaseDescription: string | null;
   tax: { id: string; name: string; rate: string } | null;
   preferredVendor: { id: string; displayName: string } | null;
   createdAt: string;
@@ -336,6 +338,7 @@ export interface SearchResultsDto {
   creditNotes: { id: string; number: string; customerName: string }[];
   salesReceipts: { id: string; number: string; customerName: string }[];
   vendors: { id: string; displayName: string; companyName: string | null }[];
+  bills: { id: string; number: string; vendorName: string }[];
 }
 
 export interface InvoiceListItemDto {
@@ -616,4 +619,88 @@ export interface ExpenseTotalsDto {
   subtotal: string;
   taxTotal: string;
   total: string;
+}
+
+// ---------- Bills and payments made ----------
+
+export interface BillListItemDto {
+  id: string;
+  billNumber: string;
+  orderNumber: string | null;
+  billDate: string;
+  dueDate: string;
+  status: BillStatus;
+  displayStatus: BillDisplayStatus;
+  total: string;
+  balanceDue: string;
+  vendor: { id: string; displayName: string };
+}
+
+export interface BillPaymentDto {
+  paymentId: string;
+  number: string;
+  paymentDate: string;
+  paymentMode: string | null;
+  amount: string;
+}
+
+export interface BillDto extends Omit<BillListItemDto, 'vendor'> {
+  paymentTerm: { id: string; name: string; days: number } | null;
+  subtotal: string;
+  discountTotal: string;
+  taxTotal: string;
+  taxBreakdown: TaxBreakdownEntry[];
+  shippingCharge: string;
+  adjustment: string;
+  amountPaid: string;
+  notes: string | null;
+  terms: string | null;
+  lines: DocumentLineDto[];
+  vendor: DocumentCustomerDto;
+  payments: BillPaymentDto[];
+  openedAt: string | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+  createdBy: NamedRef | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentMadeListItemDto {
+  id: string;
+  number: string;
+  paymentDate: string;
+  referenceNumber: string | null;
+  paymentMode: NamedRef | null;
+  amount: string;
+  unusedAmount: string;
+  vendor: { id: string; displayName: string };
+}
+
+export interface PaymentMadeDto extends Omit<PaymentMadeListItemDto, 'vendor'> {
+  notes: string | null;
+  amountApplied: string;
+  allocations: {
+    id: string;
+    amount: string;
+    bill: { id: string; billNumber: string; billDate: string; total: string; balanceDue: string };
+  }[];
+  vendor: DocumentCustomerDto;
+  createdBy: NamedRef | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A bill that can still take a payment. */
+export interface OpenBillDto {
+  id: string;
+  billNumber: string;
+  billDate: string;
+  dueDate: string;
+  status: BillStatus;
+  displayStatus: BillDisplayStatus;
+  total: string;
+  /** Balance available to this payment (includes what it already applied when editing). */
+  balanceDue: string;
+  allocated: string;
 }

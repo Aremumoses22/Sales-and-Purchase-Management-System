@@ -15,12 +15,15 @@ import { documentLineSchema, invoiceSchema, quoteSchema } from './schemas/docume
 import { itemSchema } from './schemas/items.js';
 import { applyCreditNoteSchema } from './schemas/credit-notes.js';
 import { paymentReceivedSchema } from './schemas/payments.js';
+import { billSchema, paymentMadeSchema } from './schemas/bills.js';
 import { expenseSchema } from './schemas/expenses.js';
 import { recurringInvoiceSchema } from './schemas/recurring-invoices.js';
 import { calculateExpenseAmounts } from './totals.js';
 import { salesReceiptSchema } from './schemas/sales-receipts.js';
 import {
+  canPerformBillAction,
   canPerformCreditNoteAction,
+  getBillDisplayStatus,
   canPerformInvoiceAction,
   canPerformQuoteAction,
   getCreditNoteDisplayStatus,
@@ -347,5 +350,37 @@ describe('expenses', () => {
     expect(expenseSchema.parse(base)).toMatchObject({ amountIsTaxInclusive: false, taxId: null, vendorId: null });
     expect(expenseSchema.safeParse({ ...base, amount: '0' }).success).toBe(false);
     expect(expenseSchema.safeParse({ ...base, categoryId: '' }).success).toBe(false);
+  });
+});
+
+describe('bills', () => {
+  const open = { status: 'open', amountPaid: '0', balanceDue: '100', dueDate: '2026-09-30' } as const;
+
+  it('derives the bill status the same way as invoices', () => {
+    expect(getBillDisplayStatus(open, '2026-09-16')).toBe('open');
+    expect(getBillDisplayStatus({ ...open, amountPaid: '40', balanceDue: '60' }, '2026-09-16')).toBe('partially_paid');
+    expect(getBillDisplayStatus({ ...open, amountPaid: '40', balanceDue: '60' }, '2026-10-01')).toBe('overdue');
+    expect(getBillDisplayStatus({ ...open, amountPaid: '100', balanceDue: '0' }, '2026-10-01')).toBe('paid');
+    expect(getBillDisplayStatus({ ...open, status: 'draft' }, '2026-10-01')).toBe('draft');
+  });
+
+  it('voids only unpaid open bills and deletes only drafts', () => {
+    expect(canPerformBillAction('void', open)).toBe(true);
+    expect(canPerformBillAction('void', { ...open, amountPaid: '1', balanceDue: '99' })).toBe(false);
+    expect(canPerformBillAction('delete', open)).toBe(false);
+    expect(canPerformBillAction('delete', { ...open, status: 'draft' })).toBe(true);
+    expect(canPerformBillAction('recordPayment', { ...open, status: 'void' })).toBe(false);
+  });
+
+  it('validates bill dates and payment allocations', () => {
+    const vendorId = '0199b5a0-0000-7000-8000-000000000001';
+    const billId = '0199b5a0-0000-7000-8000-00000000000b';
+    const lines = [{ name: 'Cement', quantity: '10', rate: '5000' }];
+    expect(billSchema.parse({ vendorId, billNumber: 'INV-77', billDate: '2026-09-16', dueDate: '2026-09-30', lines }).saveAs).toBe('open');
+    expect(billSchema.safeParse({ vendorId, billNumber: 'INV-77', billDate: '2026-09-16', dueDate: '2026-09-15', lines }).success).toBe(false);
+    expect(billSchema.safeParse({ vendorId, billNumber: ' ', billDate: '2026-09-16', dueDate: '2026-09-16', lines }).success).toBe(false);
+    expect(
+      paymentMadeSchema.safeParse({ vendorId, paymentDate: '2026-09-16', amount: '100', allocations: [{ billId, amount: '100.01' }] }).success,
+    ).toBe(false);
   });
 });

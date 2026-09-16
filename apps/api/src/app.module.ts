@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { AuthGuard, CsrfGuard, PermissionsGuard } from './modules/auth/guards.js';
+import { BillsModule } from './modules/bills/bills.module.js';
 import { ContactsModule } from './modules/contacts/contacts.module.js';
 import { DocumentsModule } from './modules/documents/documents.module.js';
 import { ExpensesModule } from './modules/expenses/expenses.module.js';
@@ -38,6 +39,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     SalesReceiptsModule,
     RecurringInvoicesModule,
     ExpensesModule,
+    BillsModule,
   ],
   controllers: [HealthController, SearchController],
   providers: [

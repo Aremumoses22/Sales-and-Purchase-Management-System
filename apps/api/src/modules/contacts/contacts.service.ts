@@ -320,18 +320,29 @@ export class ContactsService {
             this.prisma.salesReceipt.count({ where: { customerId: id } }),
             this.prisma.recurringInvoiceProfile.count({ where: { customerId: id } }),
           ])
-        : await Promise.all([this.prisma.expense.count({ where: { vendorId: id } })]);
+        : await Promise.all([
+            this.prisma.expense.count({ where: { vendorId: id } }),
+            this.prisma.bill.count({ where: { vendorId: id } }),
+            this.prisma.paymentMade.count({ where: { vendorId: id } }),
+          ]);
     return counts.reduce((sum, count) => sum + count, 0);
   }
 
-  /** What is owed to each vendor on open bills (arrives with bills). */
-  private async vendorBalances(_vendorIds: string[]): Promise<Map<string, Decimal>> {
-    return new Map();
+  /** What is owed to each vendor on open bills (drafts and void bills are not owed). */
+  private async vendorBalances(vendorIds: string[]): Promise<Map<string, Decimal>> {
+    if (vendorIds.length === 0) return new Map();
+    const rows = await this.prisma.bill.groupBy({
+      by: ['vendorId'],
+      where: { vendorId: { in: vendorIds }, status: 'open' },
+      _sum: { balanceDue: true },
+    });
+    return new Map(rows.map((row) => [row.vendorId, toDecimal(row._sum.balanceDue)]));
   }
 
-  /** Payments made to a vendor that are not yet used on a bill (arrives with payments made). */
-  private async unusedVendorCredits(_vendorId: string): Promise<Decimal> {
-    return toDecimal(0);
+  /** Payments made to a vendor that are not yet used on a bill. */
+  private async unusedVendorCredits(vendorId: string): Promise<Decimal> {
+    const { _sum } = await this.prisma.paymentMade.aggregate({ where: { vendorId }, _sum: { amount: true, amountApplied: true } });
+    return toDecimal(_sum.amount).minus(toDecimal(_sum.amountApplied));
   }
 
   /** What each customer still owes on sent invoices (drafts and void invoices are not owed). */

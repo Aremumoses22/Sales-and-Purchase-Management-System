@@ -50,8 +50,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/vendors', label: 'Vendors', icon: TruckIcon, permission: 'vendors:view' },
       { href: '/expenses', label: 'Expenses', icon: ShoppingCartIcon, permission: 'expenses:view' },
-      { href: '/bills', label: 'Bills', icon: ReceiptIcon, permission: 'bills:view', soon: true },
-      { href: '/payments-made', label: 'Payments Made', icon: BanknoteArrowUpIcon, permission: 'payments_made:view', soon: true },
+      { href: '/bills', label: 'Bills', icon: ReceiptIcon, permission: 'bills:view' },
+      { href: '/payments-made', label: 'Payments Made', icon: BanknoteArrowUpIcon, permission: 'payments_made:view' },
     ],
   },
   { items: [{ href: '/reports', label: 'Reports', icon: ChartColumnIcon, permission: 'reports:view', soon: true }] },

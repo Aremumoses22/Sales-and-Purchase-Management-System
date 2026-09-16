@@ -91,6 +91,16 @@ function GlobalSearch() {
               ))}
             </CommandGroup>
           ) : null}
+          {data?.bills.length ? (
+            <CommandGroup heading="Bills">
+              {data.bills.map((bill) => (
+                <CommandItem key={bill.id} value={`bill-${bill.id}`} onSelect={() => go(`/bills/${bill.id}`)}>
+                  {bill.number}
+                  <span className="text-muted-foreground"> · {bill.vendorName}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
           {data?.items.length ? (
             <CommandGroup heading="Items">
               {data.items.map((item) => (
@@ -158,6 +168,8 @@ function QuickCreate() {
     { href: '/payments-received/new', label: 'Payment received', permission: 'payments_received:create' as const },
     { href: '/credit-notes/new', label: 'Credit note', permission: 'credit_notes:create' as const },
     { href: '/customers/new', label: 'Customer', permission: 'customers:create' as const },
+    { href: '/bills/new', label: 'Bill', permission: 'bills:create' as const },
+    { href: '/payments-made/new', label: 'Payment made', permission: 'payments_made:create' as const },
     { href: '/expenses/new', label: 'Expense', permission: 'expenses:create' as const },
     { href: '/vendors/new', label: 'Vendor', permission: 'vendors:create' as const },
     { href: '/items/new', label: 'Item', permission: 'items:create' as const },

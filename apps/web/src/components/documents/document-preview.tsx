@@ -12,6 +12,8 @@ export interface DocumentPreviewProps {
   number: string;
   meta: { label: string; value: ReactNode }[];
   customer: DocumentCustomerDto;
+  /** Heading above the customer or vendor, e.g. "Vendor" on bills. */
+  partyLabel?: string;
   subject?: string | null;
   /** Heading above the subject, e.g. "Reason" on credit notes. */
   subjectLabel?: string;
@@ -50,6 +52,7 @@ export function DocumentPreview({
   number,
   meta,
   customer,
+  partyLabel = 'Bill To',
   subject,
   subjectLabel = 'Subject',
   lines,
@@ -125,7 +128,7 @@ export function DocumentPreview({
 
       <section className="mt-8 grid gap-6 sm:grid-cols-[1fr_1fr_auto]">
         <div>
-          <p className="mb-1 text-xs text-neutral-500">Bill To</p>
+          <p className="mb-1 text-xs text-neutral-500">{partyLabel}</p>
           <p className="font-semibold text-blue-700">{customer.displayName}</p>
           {billing.map((line) => (
             <p key={line} className="text-neutral-700">

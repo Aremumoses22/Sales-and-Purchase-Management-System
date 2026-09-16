@@ -18,7 +18,8 @@ A web app for managing customers, items, quotes, invoices, payments, vendors and
 | 9 Recurring Invoices | Profiles that create invoices every N days, weeks, months or years (month-end safe), hourly idempotent job, stop/resume, end dates, create invoice now | Done |
 | 10 Vendors | Vendors with contacts, addresses and payables, shared with the customer screens; preferred vendor on items | Done |
 | 11 Expenses | Expenses by category with tax (inclusive or exclusive), paid-through, vendor, receipt upload and preview, filters with totals | Done |
-| 11b–14 | Bills and payments made, dashboard, reports | Planned |
+| 11b Bills and Payments Made | Vendor bills with due dates, overdue tracking and stock receipt; payments made across bills with unused credit; vendor payables | Done |
+| 12–14 | Dashboard, reports, hardening | Planned |
 
 ## Stack
 
