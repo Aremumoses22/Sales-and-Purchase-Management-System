@@ -46,7 +46,7 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-The seed creates the roles (Admin, Accountant, Sales, Viewer), default payment terms, payment modes, expense categories, numbering, and one admin user from `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (defaults: `admin@example.com` / `Admin12345`). Change that password under **Settings → My profile**. Taxes are not seeded; add your rates under **Settings → Taxes**.
+The seed creates the roles (Admin, Accountant, Sales, Viewer), default payment terms, payment modes, expense categories, numbering, and one admin user from `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (defaults: `admin@example.com` / `Admin12345`). Change that password under **Settings → My profile**. The organization starts in Nigerian naira (NGN, ₦) with the Africa/Lagos time zone; both can be changed under **Settings → Organization**. Taxes are not seeded; add your rates (for example VAT) under **Settings → Taxes**.
 
 ## Running
 

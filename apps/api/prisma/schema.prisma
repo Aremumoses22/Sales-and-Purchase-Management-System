@@ -95,11 +95,11 @@ model Organization {
   state                String?
   postalCode           String?  @map("postal_code")
   country              String?
-  currencyCode         String   @default("USD") @map("currency_code")
-  currencySymbol       String   @default("$") @map("currency_symbol")
+  currencyCode         String   @default("NGN") @map("currency_code")
+  currencySymbol       String   @default("₦") @map("currency_symbol")
   dateFormat           String   @default("dd MMM yyyy") @map("date_format")
   fiscalYearStartMonth Int      @default(1) @map("fiscal_year_start_month")
-  timezone             String   @default("UTC")
+  timezone             String   @default("Africa/Lagos")
   logoFile             String?  @map("logo_file")
   logoMimeType         String?  @map("logo_mime_type")
   updatedAt            DateTime @updatedAt @map("updated_at")
