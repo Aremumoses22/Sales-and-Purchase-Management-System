@@ -14,3 +14,4 @@ export * from './schemas/documents.js';
 export * from './schemas/payments.js';
 export * from './schemas/credit-notes.js';
 export * from './schemas/sales-receipts.js';
+export * from './schemas/recurring-invoices.js';

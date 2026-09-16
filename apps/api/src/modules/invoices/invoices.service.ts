@@ -52,6 +52,7 @@ const INVOICE_INCLUDE = {
   customer: { include: { addresses: true } },
   paymentTerm: { select: { id: true, name: true, days: true } },
   quote: { select: { id: true, number: true } },
+  recurringProfile: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },
   allocations: {
     include: {
@@ -121,6 +122,7 @@ function toInvoiceDto(invoice: InvoiceDetail, today: string): InvoiceDto {
     lines: invoice.lines.map(toDocumentLineDto),
     customer: toDocumentCustomer(invoice.customer),
     quote: invoice.quote,
+    recurringProfile: invoice.recurringProfile,
     payments: invoice.allocations.map((allocation) => ({
       paymentId: allocation.payment.id,
       number: allocation.payment.number,
@@ -516,74 +518,103 @@ export class InvoicesService {
     }
   }
 
+  /**
+   * Creates an invoice for a recurring profile inside the caller's transaction. The unique
+   * profile + period key means a period can never be invoiced twice.
+   */
+  async createForRecurringProfile(
+    tx: Tx,
+    input: InvoiceOutput,
+    recurring: { profileId: string; profileName: string; periodDate: string | null },
+  ): Promise<{ id: string; number: string }> {
+    const customer = await this.requireCustomer(input.customerId);
+    await this.requirePaymentTerm(input.paymentTermId);
+    return this.insertInTransaction(tx, input, customer, {
+      recurring,
+      origin: `from recurring profile ${recurring.profileName}`,
+    });
+  }
+
   private async insert(
     input: InvoiceOutput,
     options: { origin?: string; quote?: { id: string; number: string } } = {},
   ): Promise<InvoiceDto> {
     const customer = await this.requireCustomer(input.customerId);
     await this.requirePaymentTerm(input.paymentTermId);
+    const { id } = await this.prisma.$transaction((tx) => this.insertInTransaction(tx, input, customer, options));
+    return this.get(id);
+  }
+
+  private async insertInTransaction(
+    tx: Tx,
+    input: InvoiceOutput,
+    customer: { displayName: string },
+    options: {
+      origin?: string;
+      quote?: { id: string; number: string };
+      recurring?: { profileId: string; periodDate: string | null };
+    },
+  ): Promise<{ id: string; number: string }> {
     const markSent = input.saveAs === 'sent';
-
-    const id = await this.prisma.$transaction(async (tx) => {
-      if (options.quote) {
-        const { count } = await tx.quote.updateMany({
-          where: { id: options.quote.id, status: 'accepted' },
-          data: { status: 'invoiced' },
-        });
-        if (count === 0) {
-          throw conflict('QUOTE_CHANGED', 'This quote is no longer accepted. Refresh and try again.');
-        }
-      }
-
-      const prepared = await this.documentLines.prepare(input, tx);
-      const number = await this.numberSeries.next(tx, 'invoice', (candidate) => this.numberTaken(tx, candidate));
-      const invoice = await tx.invoice.create({
-        data: {
-          number,
-          ...this.headerData(input),
-          ...totalsData(prepared),
-          amountPaid: '0',
-          balanceDue: prepared.totals.total,
-          status: markSent ? 'sent' : 'draft',
-          sentAt: markSent ? new Date() : null,
-          quoteId: options.quote?.id ?? null,
-          createdById: getRequestContext()?.userId ?? null,
-          lines: { create: prepared.lines },
-        },
+    if (options.quote) {
+      const { count } = await tx.quote.updateMany({
+        where: { id: options.quote.id, status: 'accepted' },
+        data: { status: 'invoiced' },
       });
-      if (markSent) await this.syncStock(tx, invoice, prepared.lines);
+      if (count === 0) {
+        throw conflict('QUOTE_CHANGED', 'This quote is no longer accepted. Refresh and try again.');
+      }
+    }
 
-      const details = [
-        options.quote ? `from quote ${options.quote.number}` : null,
-        options.origin,
-        markSent ? 'marked as sent' : null,
-      ]
-        .filter(Boolean)
-        .join(', ');
+    const prepared = await this.documentLines.prepare(input, tx);
+    const number = await this.numberSeries.next(tx, 'invoice', (candidate) => this.numberTaken(tx, candidate));
+    const invoice = await tx.invoice.create({
+      data: {
+        number,
+        ...this.headerData(input),
+        ...totalsData(prepared),
+        amountPaid: '0',
+        balanceDue: prepared.totals.total,
+        status: markSent ? 'sent' : 'draft',
+        sentAt: markSent ? new Date() : null,
+        quoteId: options.quote?.id ?? null,
+        recurringProfileId: options.recurring?.profileId ?? null,
+        recurringPeriodDate: options.recurring?.periodDate ? fromDateOnly(options.recurring.periodDate) : null,
+        createdById: getRequestContext()?.userId ?? null,
+        lines: { create: prepared.lines },
+      },
+    });
+    if (markSent) await this.syncStock(tx, invoice, prepared.lines);
+
+    const details = [
+      options.quote ? `from quote ${options.quote.number}` : null,
+      options.origin,
+      markSent ? 'marked as sent' : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
+    await this.audit.record(
+      {
+        action: 'created',
+        entityType: 'invoice',
+        entityId: invoice.id,
+        summary: `Invoice ${number} for ${customer.displayName} created${details ? ` (${details})` : ''}`,
+      },
+      tx,
+    );
+    if (options.quote) {
       await this.audit.record(
         {
-          action: 'created',
-          entityType: 'invoice',
-          entityId: invoice.id,
-          summary: `Invoice ${number} for ${customer.displayName} created${details ? ` (${details})` : ''}`,
+          action: 'status_changed',
+          entityType: 'quote',
+          entityId: options.quote.id,
+          summary: `Quote ${options.quote.number} converted to invoice ${number}`,
+          changes: { status: { from: 'accepted', to: 'invoiced' } },
         },
         tx,
       );
-      if (options.quote) {
-        await this.audit.record(
-          {
-            action: 'status_changed',
-            entityType: 'quote',
-            entityId: options.quote.id,
-            summary: `Quote ${options.quote.number} converted to invoice ${number}`,
-            changes: { status: { from: 'accepted', to: 'invoiced' } },
-          },
-          tx,
-        );
-      }
-      return invoice.id;
-    });
-    return this.get(id);
+    }
+    return { id: invoice.id, number };
   }
 
   private syncStock(
@@ -646,6 +677,7 @@ export class InvoicesService {
   private where(query: InvoiceListQuery, today: string): Prisma.InvoiceWhereInput {
     const and: Prisma.InvoiceWhereInput[] = [];
     if (query.customerId) and.push({ customerId: query.customerId });
+    if (query.recurringProfileId) and.push({ recurringProfileId: query.recurringProfileId });
     if (query.dateFrom) and.push({ invoiceDate: { gte: fromDateOnly(query.dateFrom) } });
     if (query.dateTo) and.push({ invoiceDate: { lte: fromDateOnly(query.dateTo) } });
     if (query.q) {

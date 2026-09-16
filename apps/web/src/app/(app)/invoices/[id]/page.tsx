@@ -16,6 +16,7 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PrinterIcon,
+  RefreshCwIcon,
   SendIcon,
   WalletIcon,
 } from 'lucide-react';
@@ -432,6 +433,15 @@ export default function InvoiceDetailPage() {
                 <p className="mx-auto max-w-[210mm] rounded-lg bg-muted px-4 py-2 text-sm text-muted-foreground">
                   Voided {invoice.voidedAt ? formatDateTime(invoice.voidedAt, organization) : ''}
                   {invoice.voidReason ? `: ${invoice.voidReason}` : '.'}
+                </p>
+              ) : null}
+              {invoice.recurringProfile ? (
+                <p className="mx-auto flex max-w-[210mm] items-center gap-1.5 text-sm text-muted-foreground">
+                  <RefreshCwIcon className="size-4" />
+                  Created by recurring invoice{' '}
+                  <Link href={`/recurring-invoices/${invoice.recurringProfile.id}`} className="font-medium text-primary hover:underline">
+                    {invoice.recurringProfile.name}
+                  </Link>
                 </p>
               ) : null}
               {invoice.quote ? (

@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { formatDocumentNumber } from './constants.js';
-import { addDays, daysBetween, isDateOnly, todayInTimeZone } from './dates.js';
+import {
+  addDays,
+  addMonths,
+  daysBetween,
+  firstOccurrenceOnOrAfter,
+  isDateOnly,
+  occurrenceDate,
+  todayInTimeZone,
+} from './dates.js';
 import { ALL_PERMISSIONS, DEFAULT_ROLES, isPermission } from './permissions.js';
 import { contactSchema } from './schemas/contacts.js';
 import { documentLineSchema, invoiceSchema, quoteSchema } from './schemas/documents.js';
 import { itemSchema } from './schemas/items.js';
 import { applyCreditNoteSchema } from './schemas/credit-notes.js';
 import { paymentReceivedSchema } from './schemas/payments.js';
+import { recurringInvoiceSchema } from './schemas/recurring-invoices.js';
 import { salesReceiptSchema } from './schemas/sales-receipts.js';
 import {
   canPerformCreditNoteAction,
@@ -15,6 +24,7 @@ import {
   getCreditNoteDisplayStatus,
   getInvoiceDisplayStatus,
   getQuoteDisplayStatus,
+  getRecurringProfileDisplayStatus,
   canPerformSalesReceiptAction,
 } from './statuses.js';
 
@@ -259,5 +269,56 @@ describe('sales receipt rules', () => {
     });
     expect(result.saveAs).toBe('completed');
     expect(result.paymentModeId).toBeNull();
+  });
+});
+
+describe('recurring schedules', () => {
+  it('keeps month ends from drifting', () => {
+    expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
+    expect(addMonths('2028-01-31', 1)).toBe('2028-02-29');
+    expect(addMonths('2026-12-15', 2)).toBe('2027-02-15');
+    const monthly = [0, 1, 2, 3].map((n) => occurrenceDate('2026-01-31', 'month', 1, n));
+    expect(monthly).toEqual(['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30']);
+    expect(occurrenceDate('2028-02-29', 'year', 1, 1)).toBe('2029-02-28');
+  });
+
+  it('works out weekly, every-N-days and quarterly periods', () => {
+    expect(occurrenceDate('2026-09-01', 'week', 2, 3)).toBe('2026-10-13');
+    expect(occurrenceDate('2026-09-01', 'day', 10, 3)).toBe('2026-10-01');
+    expect(occurrenceDate('2026-11-30', 'month', 3, 1)).toBe('2027-02-28');
+  });
+
+  it('finds the first period on or after a date', () => {
+    expect(firstOccurrenceOnOrAfter('2026-01-31', 'month', 1, '2026-01-01')).toBe(0);
+    expect(firstOccurrenceOnOrAfter('2026-01-31', 'month', 1, '2026-02-28')).toBe(1);
+    expect(firstOccurrenceOnOrAfter('2026-01-31', 'month', 1, '2026-03-01')).toBe(2);
+    expect(firstOccurrenceOnOrAfter('2020-01-01', 'day', 1, '2026-09-16')).toBe(daysBetween('2020-01-01', '2026-09-16'));
+    for (const date of ['2026-05-30', '2026-05-31', '2026-06-01', '2027-01-30']) {
+      const n = firstOccurrenceOnOrAfter('2026-01-31', 'month', 1, date);
+      expect(occurrenceDate('2026-01-31', 'month', 1, n) >= date).toBe(true);
+      if (n > 0) expect(occurrenceDate('2026-01-31', 'month', 1, n - 1) < date).toBe(true);
+    }
+  });
+
+  it('shows an active profile past its end date as expired', () => {
+    expect(getRecurringProfileDisplayStatus({ status: 'active', endDate: '2026-12-31', nextRunDate: '2027-01-31' })).toBe('expired');
+    expect(getRecurringProfileDisplayStatus({ status: 'active', endDate: '2026-12-31', nextRunDate: '2026-12-31' })).toBe('active');
+    expect(getRecurringProfileDisplayStatus({ status: 'active', endDate: null, nextRunDate: '2099-01-01' })).toBe('active');
+    expect(getRecurringProfileDisplayStatus({ status: 'stopped', endDate: '2026-01-01', nextRunDate: '2027-01-01' })).toBe('stopped');
+  });
+
+  it('validates the profile schedule', () => {
+    const base = {
+      name: 'Monthly retainer',
+      customerId: '0199b5a0-0000-7000-8000-000000000001',
+      repeatEvery: '1',
+      repeatUnit: 'month',
+      startDate: '2026-10-01',
+      lines: [{ name: 'Retainer', quantity: '1', rate: '250000' }],
+    };
+    const parsed = recurringInvoiceSchema.parse(base);
+    expect(parsed).toMatchObject({ repeatEvery: 1, endDate: null, createAs: 'draft' });
+    expect(recurringInvoiceSchema.safeParse({ ...base, endDate: '2026-09-30' }).success).toBe(false);
+    expect(recurringInvoiceSchema.safeParse({ ...base, repeatEvery: '0' }).success).toBe(false);
   });
 });

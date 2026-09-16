@@ -142,6 +142,7 @@ function QuickCreate() {
     { href: '/invoices/new', label: 'Invoice', permission: 'invoices:create' as const },
     { href: '/quotes/new', label: 'Quote', permission: 'quotes:create' as const },
     { href: '/sales-receipts/new', label: 'Sales receipt', permission: 'sales_receipts:create' as const },
+    { href: '/recurring-invoices/new', label: 'Recurring invoice', permission: 'recurring_invoices:create' as const },
     { href: '/payments-received/new', label: 'Payment received', permission: 'payments_received:create' as const },
     { href: '/credit-notes/new', label: 'Credit note', permission: 'credit_notes:create' as const },
     { href: '/customers/new', label: 'Customer', permission: 'customers:create' as const },

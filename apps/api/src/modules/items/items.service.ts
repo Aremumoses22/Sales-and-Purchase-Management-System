@@ -201,14 +201,15 @@ export class ItemsService {
 
   async remove(id: string): Promise<void> {
     const item = await this.find(id);
-    const [quoteLines, invoiceLines, creditNoteLines, salesReceiptLines, movements] = await Promise.all([
+    const [quoteLines, invoiceLines, creditNoteLines, salesReceiptLines, recurringLines, movements] = await Promise.all([
       this.prisma.quoteLine.count({ where: { itemId: id } }),
       this.prisma.invoiceLine.count({ where: { itemId: id } }),
       this.prisma.creditNoteLine.count({ where: { itemId: id } }),
       this.prisma.salesReceiptLine.count({ where: { itemId: id } }),
+      this.prisma.recurringInvoiceLine.count({ where: { itemId: id } }),
       this.prisma.stockMovement.count({ where: { itemId: id, type: { not: 'opening' } } }),
     ]);
-    if (quoteLines + invoiceLines + creditNoteLines + salesReceiptLines + movements > 0) {
+    if (quoteLines + invoiceLines + creditNoteLines + salesReceiptLines + recurringLines + movements > 0) {
       throw conflict(
         'ITEM_IN_USE',
         `${item.name} is used in transactions and cannot be deleted. Mark it as inactive instead.`,

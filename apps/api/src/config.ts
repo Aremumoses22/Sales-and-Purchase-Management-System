@@ -15,4 +15,6 @@ export const config = {
   refreshTokenTtlDays: Number(process.env['REFRESH_TOKEN_TTL_DAYS'] ?? 7),
   cookieSecure: process.env['COOKIE_SECURE'] === 'true',
   uploadDir: path.resolve(process.env['UPLOAD_DIR'] ?? 'uploads'),
+  /** Runs the recurring invoice job on a schedule; tests switch it off and call the job directly. */
+  recurringJobEnabled: process.env['RECURRING_JOB_ENABLED'] !== 'false',
 } as const;

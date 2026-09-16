@@ -6,6 +6,7 @@ import type {
   ItemType,
   StockMovementType,
 } from './constants.js';
+import type { RecurrenceUnit } from './dates.js';
 import type { Permission } from './permissions.js';
 import type {
   CreditNoteDisplayStatus,
@@ -14,6 +15,8 @@ import type {
   InvoiceStatus,
   QuoteDisplayStatus,
   QuoteStatus,
+  RecurringProfileDisplayStatus,
+  RecurringProfileStatus,
   SalesReceiptStatus,
 } from './statuses.js';
 import type { TaxBreakdownEntry } from './totals.js';
@@ -356,6 +359,8 @@ export interface InvoiceDto extends Omit<InvoiceListItemDto, 'customer'> {
   customer: DocumentCustomerDto;
   /** The quote this invoice was converted from. */
   quote: { id: string; number: string } | null;
+  /** The recurring profile that generated this invoice. */
+  recurringProfile: { id: string; name: string } | null;
   payments: InvoicePaymentDto[];
   credits: InvoiceCreditDto[];
   sentAt: string | null;
@@ -524,4 +529,49 @@ export interface SalesReceiptDto extends Omit<SalesReceiptListItemDto, 'customer
   createdBy: NamedRef | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ---------- Recurring invoices ----------
+
+export interface RecurringInvoiceListItemDto {
+  id: string;
+  name: string;
+  repeatEvery: number;
+  repeatUnit: RecurrenceUnit;
+  startDate: string;
+  endDate: string | null;
+  nextRunDate: string | null;
+  lastRunAt: string | null;
+  status: RecurringProfileStatus;
+  displayStatus: RecurringProfileDisplayStatus;
+  total: string;
+  customer: { id: string; displayName: string };
+}
+
+export interface RecurringInvoiceDto extends Omit<RecurringInvoiceListItemDto, 'customer'> {
+  paymentTerm: { id: string; name: string; days: number } | null;
+  createAs: 'draft' | 'sent';
+  orderNumber: string | null;
+  subject: string | null;
+  subtotal: string;
+  discountTotal: string;
+  taxTotal: string;
+  taxBreakdown: TaxBreakdownEntry[];
+  shippingCharge: string;
+  adjustment: string;
+  customerNotes: string | null;
+  terms: string | null;
+  lines: DocumentLineDto[];
+  customer: DocumentCustomerDto;
+  invoiceCount: number;
+  lastError: string | null;
+  createdBy: NamedRef | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** What one run of the recurring invoice job did. */
+export interface RecurringRunResultDto {
+  created: { profileId: string; invoiceId: string; number: string; periodDate: string }[];
+  failed: { profileId: string; error: string }[];
 }

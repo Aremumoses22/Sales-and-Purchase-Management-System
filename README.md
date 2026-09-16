@@ -15,7 +15,8 @@ A web app for managing customers, items, quotes, invoices, payments, vendors and
 | 6 Payments Received | Record one payment across several invoices, keep the excess as unused credit, apply credits to invoices, refunds, receipts | Done |
 | 7 Credit Notes | Credit notes from scratch or from an invoice, apply to one or more invoices (also from the invoice page), refunds, returns to stock, void, print/PDF | Done |
 | 8 Sales Receipts | Sales paid on the spot with payment mode and reference, stock updates, drafts, void, clone, print/PDF; never counted as owed | Done |
-| 9–14 | Recurring invoices, vendors, expenses, bills, dashboard, reports | Planned |
+| 9 Recurring Invoices | Profiles that create invoices every N days, weeks, months or years (month-end safe), hourly idempotent job, stop/resume, end dates, create invoice now | Done |
+| 10–14 | Vendors, expenses, bills, dashboard, reports | Planned |
 
 ## Stack
 
@@ -59,6 +60,8 @@ pnpm dev
 ```
 
 This builds the shared package, then runs it in watch mode alongside the API and the web app. Open http://localhost:3000.
+
+The API runs the recurring invoice job every hour, creating any invoices that are due. It is safe to run more than one API process: each period is invoiced once. Set `RECURRING_JOB_ENABLED=false` to turn the job off (the e2e tests do this and call the job directly).
 
 ## Tests
 

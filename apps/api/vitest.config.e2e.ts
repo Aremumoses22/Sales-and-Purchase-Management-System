@@ -7,7 +7,7 @@ export default defineConfig({
     root: './',
     include: ['test/**/*.e2e-spec.ts'],
     // The app under test talks to the dedicated test database, never the dev one.
-    env: { DATABASE_URL: process.env['TEST_DATABASE_URL'] ?? '' },
+    env: { DATABASE_URL: process.env['TEST_DATABASE_URL'] ?? '', RECURRING_JOB_ENABLED: 'false' },
     globalSetup: ['test/global-setup.ts'],
     // All e2e files share one test database.
     fileParallelism: false,

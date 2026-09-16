@@ -7,6 +7,7 @@ import type {
   InvoiceListItemDto,
   PaymentReceivedListItemDto,
   QuoteListItemDto,
+  RecurringInvoiceListItemDto,
 } from '@spms/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
@@ -21,6 +22,7 @@ import {
   PhoneIcon,
   PlusIcon,
   ReceiptIcon,
+  RefreshCwIcon,
   ScrollTextIcon,
   WalletIcon,
 } from 'lucide-react';
@@ -55,6 +57,8 @@ import { useCreditNotes } from '@/features/credit-notes/api';
 import { useInvoices } from '@/features/invoices/api';
 import { usePayments } from '@/features/payments/api';
 import { useQuotes } from '@/features/quotes/api';
+import { useRecurringInvoices } from '@/features/recurring-invoices/api';
+import { formatRecurrence } from '@/features/recurring-invoices/format';
 import { useSalesReceipts } from '@/features/sales-receipts/api';
 import { addressLines } from '@/lib/address';
 import { formatDate } from '@/lib/format';
@@ -156,6 +160,49 @@ function CustomerPayments({ customerId }: { customerId: string }) {
         rowKey={(row) => row.id}
         rowHref={(row) => `/payments-received/${row.id}`}
         empty={<EmptyState icon={<BanknoteArrowDownIcon className="size-7" />} title="No payments from this customer yet" />}
+      />
+    </div>
+  );
+}
+
+function CustomerRecurringInvoices({ customerId }: { customerId: string }) {
+  const organization = useOrganization();
+  const can = useCan();
+  const { data, isPending } = useRecurringInvoices({ customerId, pageSize: 10, status: 'all', sort: 'name' }, can('recurring_invoices:view'));
+
+  const columns: ColumnDef<RecurringInvoiceListItemDto, unknown>[] = [
+    { id: 'name', header: 'Profile name', cell: ({ row }) => <span className="font-medium text-primary">{row.original.name}</span> },
+    { id: 'frequency', header: 'Frequency', cell: ({ row }) => formatRecurrence(row.original.repeatEvery, row.original.repeatUnit) },
+    {
+      id: 'next',
+      header: 'Next invoice date',
+      cell: ({ row }) => (row.original.nextRunDate ? formatDate(row.original.nextRunDate, organization) : '—'),
+    },
+    { id: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.displayStatus} /> },
+    { id: 'total', header: 'Amount', meta: { align: 'right' }, cell: ({ row }) => <Money value={row.original.total} /> },
+  ];
+
+  if (!can('recurring_invoices:view')) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Recurring invoices</h3>
+        {can('recurring_invoices:create') ? (
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/recurring-invoices/new?customerId=${customerId}`} />}>
+            <PlusIcon />
+            New recurring invoice
+          </Button>
+        ) : null}
+      </div>
+      <DataTable
+        columns={columns}
+        data={data?.data}
+        meta={data?.meta}
+        isLoading={isPending}
+        rowKey={(row) => row.id}
+        rowHref={(row) => `/recurring-invoices/${row.id}`}
+        empty={<EmptyState icon={<RefreshCwIcon className="size-7" />} title="No recurring invoices for this customer yet" />}
       />
     </div>
   );
@@ -364,7 +411,7 @@ export default function CustomerDetailPage() {
               Edit
             </Button>
           ) : null}
-          {customer.isActive && (can('invoices:create') || can('quotes:create') || can('payments_received:create') || can('credit_notes:create') || can('sales_receipts:create')) ? (
+          {customer.isActive && (can('invoices:create') || can('quotes:create') || can('payments_received:create') || can('credit_notes:create') || can('sales_receipts:create') || can('recurring_invoices:create')) ? (
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button />}>
                 <PlusIcon />
@@ -380,6 +427,9 @@ export default function CustomerDetailPage() {
                 ) : null}
                 {can('sales_receipts:create') ? (
                   <DropdownMenuItem render={<Link href={`/sales-receipts/new?customerId=${id}`} />}>Sales receipt</DropdownMenuItem>
+                ) : null}
+                {can('recurring_invoices:create') ? (
+                  <DropdownMenuItem render={<Link href={`/recurring-invoices/new?customerId=${id}`} />}>Recurring invoice</DropdownMenuItem>
                 ) : null}
                 {can('payments_received:create') ? (
                   <DropdownMenuItem render={<Link href={`/payments-received/new?customerId=${id}`} />}>Payment received</DropdownMenuItem>
@@ -529,6 +579,7 @@ export default function CustomerDetailPage() {
             <CustomerPayments customerId={id} />
             <CustomerCreditNotes customerId={id} />
             <CustomerSalesReceipts customerId={id} />
+            <CustomerRecurringInvoices customerId={id} />
             <CustomerQuotes customerId={id} />
           </div>
         </TabsContent>

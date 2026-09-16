@@ -103,6 +103,7 @@ export type InvoiceOutput = z.output<typeof invoiceSchema>;
 export const invoiceListQuerySchema = paginationQuerySchema.extend({
   status: z.enum(['all', ...INVOICE_DISPLAY_STATUSES]).default('all'),
   customerId: z.uuid().optional(),
+  recurringProfileId: z.uuid().optional(),
   dateFrom: dateSchema.optional(),
   dateTo: dateSchema.optional(),
 });

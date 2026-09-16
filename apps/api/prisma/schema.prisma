@@ -22,19 +22,20 @@ model User {
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  refreshTokens         RefreshToken[]
-  auditLogs             AuditLog[]
-  contactsCreated       Contact[]           @relation("ContactCreatedBy")
-  itemsCreated          Item[]              @relation("ItemCreatedBy")
-  stockMovementsCreated StockMovement[]     @relation("StockMovementCreatedBy")
-  quotesCreated         Quote[]             @relation("QuoteCreatedBy")
-  invoicesCreated       Invoice[]           @relation("InvoiceCreatedBy")
-  paymentsCreated       PaymentReceived[]   @relation("PaymentCreatedBy")
-  refundsCreated        PaymentRefund[]     @relation("RefundCreatedBy")
-  creditNotesCreated    CreditNote[]        @relation("CreditNoteCreatedBy")
-  creditApplications    CreditApplication[] @relation("CreditApplicationCreatedBy")
-  creditRefundsCreated  CreditNoteRefund[]  @relation("CreditRefundCreatedBy")
-  salesReceiptsCreated  SalesReceipt[]      @relation("SalesReceiptCreatedBy")
+  refreshTokens            RefreshToken[]
+  auditLogs                AuditLog[]
+  contactsCreated          Contact[]                 @relation("ContactCreatedBy")
+  itemsCreated             Item[]                    @relation("ItemCreatedBy")
+  stockMovementsCreated    StockMovement[]           @relation("StockMovementCreatedBy")
+  quotesCreated            Quote[]                   @relation("QuoteCreatedBy")
+  invoicesCreated          Invoice[]                 @relation("InvoiceCreatedBy")
+  paymentsCreated          PaymentReceived[]         @relation("PaymentCreatedBy")
+  refundsCreated           PaymentRefund[]           @relation("RefundCreatedBy")
+  creditNotesCreated       CreditNote[]              @relation("CreditNoteCreatedBy")
+  creditApplications       CreditApplication[]       @relation("CreditApplicationCreatedBy")
+  creditRefundsCreated     CreditNoteRefund[]        @relation("CreditRefundCreatedBy")
+  salesReceiptsCreated     SalesReceipt[]            @relation("SalesReceiptCreatedBy")
+  recurringInvoicesCreated RecurringInvoiceProfile[] @relation("RecurringInvoiceCreatedBy")
 
   @@map("users")
 }
@@ -142,8 +143,9 @@ model PaymentTerm {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  contacts Contact[]
-  invoices Invoice[]
+  contacts          Contact[]
+  invoices          Invoice[]
+  recurringInvoices RecurringInvoiceProfile[]
 
   @@map("payment_terms")
 }
@@ -156,11 +158,12 @@ model Tax {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  items             Item[]
-  quoteLines        QuoteLine[]
-  invoiceLines      InvoiceLine[]
-  creditNoteLines   CreditNoteLine[]
-  salesReceiptLines SalesReceiptLine[]
+  items                 Item[]
+  quoteLines            QuoteLine[]
+  invoiceLines          InvoiceLine[]
+  creditNoteLines       CreditNoteLine[]
+  salesReceiptLines     SalesReceiptLine[]
+  recurringInvoiceLines RecurringInvoiceLine[]
 
   @@map("taxes")
 }
@@ -240,7 +243,8 @@ model Contact {
   paymentsReceived  PaymentReceived[]
   creditNotes       CreditNote[]
   salesReceipts     SalesReceipt[]
-  preferredForItems Item[]            @relation("ItemPreferredVendor")
+  recurringInvoices RecurringInvoiceProfile[]
+  preferredForItems Item[]                    @relation("ItemPreferredVendor")
 
   @@index([type, isActive, displayName])
   @@map("contacts")
@@ -321,11 +325,12 @@ model Item {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  stockMovements    StockMovement[]
-  quoteLines        QuoteLine[]
-  invoiceLines      InvoiceLine[]
-  creditNoteLines   CreditNoteLine[]
-  salesReceiptLines SalesReceiptLine[]
+  stockMovements        StockMovement[]
+  quoteLines            QuoteLine[]
+  invoiceLines          InvoiceLine[]
+  creditNoteLines       CreditNoteLine[]
+  salesReceiptLines     SalesReceiptLine[]
+  recurringInvoiceLines RecurringInvoiceLine[]
 
   @@index([isActive, name])
   @@map("items")
@@ -436,37 +441,41 @@ enum InvoiceStatus {
 }
 
 model Invoice {
-  id             String        @id @default(uuid(7)) @db.Uuid
-  number         String        @unique
-  customerId     String        @map("customer_id") @db.Uuid
-  customer       Contact       @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  quoteId        String?       @unique @map("quote_id") @db.Uuid
-  quote          Quote?        @relation(fields: [quoteId], references: [id], onDelete: SetNull)
-  invoiceDate    DateTime      @map("invoice_date") @db.Date
-  dueDate        DateTime      @map("due_date") @db.Date
-  paymentTermId  String?       @map("payment_term_id") @db.Uuid
-  paymentTerm    PaymentTerm?  @relation(fields: [paymentTermId], references: [id], onDelete: SetNull)
-  orderNumber    String?       @map("order_number")
-  subject        String?
-  status         InvoiceStatus @default(draft)
-  subtotal       Decimal       @db.Decimal(18, 2)
-  discountTotal  Decimal       @map("discount_total") @db.Decimal(18, 2)
-  taxTotal       Decimal       @map("tax_total") @db.Decimal(18, 2)
-  shippingCharge Decimal       @default(0) @map("shipping_charge") @db.Decimal(18, 2)
-  adjustment     Decimal       @default(0) @db.Decimal(18, 2)
-  total          Decimal       @db.Decimal(18, 2)
+  id                  String                   @id @default(uuid(7)) @db.Uuid
+  number              String                   @unique
+  customerId          String                   @map("customer_id") @db.Uuid
+  customer            Contact                  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  quoteId             String?                  @unique @map("quote_id") @db.Uuid
+  quote               Quote?                   @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  invoiceDate         DateTime                 @map("invoice_date") @db.Date
+  dueDate             DateTime                 @map("due_date") @db.Date
+  paymentTermId       String?                  @map("payment_term_id") @db.Uuid
+  paymentTerm         PaymentTerm?             @relation(fields: [paymentTermId], references: [id], onDelete: SetNull)
+  orderNumber         String?                  @map("order_number")
+  subject             String?
+  status              InvoiceStatus            @default(draft)
+  subtotal            Decimal                  @db.Decimal(18, 2)
+  discountTotal       Decimal                  @map("discount_total") @db.Decimal(18, 2)
+  taxTotal            Decimal                  @map("tax_total") @db.Decimal(18, 2)
+  shippingCharge      Decimal                  @default(0) @map("shipping_charge") @db.Decimal(18, 2)
+  adjustment          Decimal                  @default(0) @db.Decimal(18, 2)
+  total               Decimal                  @db.Decimal(18, 2)
   /// Payments and credits applied so far.
-  amountPaid     Decimal       @default(0) @map("amount_paid") @db.Decimal(18, 2)
-  balanceDue     Decimal       @map("balance_due") @db.Decimal(18, 2)
-  customerNotes  String?       @map("customer_notes")
-  terms          String?
-  sentAt         DateTime?     @map("sent_at")
-  voidedAt       DateTime?     @map("voided_at")
-  voidReason     String?       @map("void_reason")
-  createdById    String?       @map("created_by_id") @db.Uuid
-  createdBy      User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
+  amountPaid          Decimal                  @default(0) @map("amount_paid") @db.Decimal(18, 2)
+  balanceDue          Decimal                  @map("balance_due") @db.Decimal(18, 2)
+  customerNotes       String?                  @map("customer_notes")
+  terms               String?
+  sentAt              DateTime?                @map("sent_at")
+  voidedAt            DateTime?                @map("voided_at")
+  voidReason          String?                  @map("void_reason")
+  /// Set when a recurring profile generated this invoice; the period makes generation idempotent.
+  recurringProfileId  String?                  @map("recurring_profile_id") @db.Uuid
+  recurringProfile    RecurringInvoiceProfile? @relation(fields: [recurringProfileId], references: [id], onDelete: SetNull)
+  recurringPeriodDate DateTime?                @map("recurring_period_date") @db.Date
+  createdById         String?                  @map("created_by_id") @db.Uuid
+  createdBy           User?                    @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
 
   lines              InvoiceLine[]
   allocations        PaymentAllocation[]
@@ -474,6 +483,7 @@ model Invoice {
   /// Credit notes raised against this invoice.
   creditNotes        CreditNote[]
 
+  @@unique([recurringProfileId, recurringPeriodDate])
   @@index([customerId])
   @@index([status, dueDate])
   @@index([invoiceDate])
@@ -752,4 +762,93 @@ model SalesReceiptLine {
   @@index([salesReceiptId])
   @@index([itemId])
   @@map("sales_receipt_lines")
+}
+
+// ─────────────────────────────── Sales: Recurring invoices ───────────────────────────────
+
+enum RecurrenceUnit {
+  day
+  week
+  month
+  year
+}
+
+/// Stored lifecycle. "Expired" is derived: an active profile whose next run is past its end date.
+enum RecurringProfileStatus {
+  active
+  stopped
+}
+
+enum RecurringCreateAs {
+  draft
+  sent
+}
+
+model RecurringInvoiceProfile {
+  id             String                 @id @default(uuid(7)) @db.Uuid
+  name           String
+  customerId     String                 @map("customer_id") @db.Uuid
+  customer       Contact                @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  repeatEvery    Int                    @default(1) @map("repeat_every")
+  repeatUnit     RecurrenceUnit         @map("repeat_unit")
+  startDate      DateTime               @map("start_date") @db.Date
+  /// Null when the profile never expires.
+  endDate        DateTime?              @map("end_date") @db.Date
+  paymentTermId  String?                @map("payment_term_id") @db.Uuid
+  paymentTerm    PaymentTerm?           @relation(fields: [paymentTermId], references: [id], onDelete: SetNull)
+  createAs       RecurringCreateAs      @default(draft) @map("create_as")
+  status         RecurringProfileStatus @default(active)
+  /// Occurrence number of the next period (0 = the start date); dates are always derived from
+  /// the start date so month ends never drift (31 Jan → 28/29 Feb → 31 Mar).
+  nextIndex      Int                    @default(0) @map("next_index")
+  nextRunDate    DateTime               @map("next_run_date") @db.Date
+  lastRunAt      DateTime?              @map("last_run_at")
+  lastError      String?                @map("last_error")
+  orderNumber    String?                @map("order_number")
+  subject        String?
+  subtotal       Decimal                @db.Decimal(18, 2)
+  discountTotal  Decimal                @map("discount_total") @db.Decimal(18, 2)
+  taxTotal       Decimal                @map("tax_total") @db.Decimal(18, 2)
+  shippingCharge Decimal                @default(0) @map("shipping_charge") @db.Decimal(18, 2)
+  adjustment     Decimal                @default(0) @db.Decimal(18, 2)
+  total          Decimal                @db.Decimal(18, 2)
+  customerNotes  String?                @map("customer_notes")
+  terms          String?
+  createdById    String?                @map("created_by_id") @db.Uuid
+  createdBy      User?                  @relation("RecurringInvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  lines    RecurringInvoiceLine[]
+  invoices Invoice[]
+
+  @@index([customerId])
+  @@index([status, nextRunDate])
+  @@map("recurring_invoice_profiles")
+}
+
+model RecurringInvoiceLine {
+  id            String                  @id @default(uuid(7)) @db.Uuid
+  profileId     String                  @map("profile_id") @db.Uuid
+  profile       RecurringInvoiceProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  position      Int
+  itemId        String?                 @map("item_id") @db.Uuid
+  item          Item?                   @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  name          String
+  description   String?
+  quantity      Decimal                 @db.Decimal(18, 3)
+  unit          String?
+  rate          Decimal                 @db.Decimal(18, 2)
+  discountType  DiscountType            @default(percent) @map("discount_type")
+  discountValue Decimal                 @default(0) @map("discount_value") @db.Decimal(18, 2)
+  taxId         String?                 @map("tax_id") @db.Uuid
+  tax           Tax?                    @relation(fields: [taxId], references: [id], onDelete: SetNull)
+  taxName       String?                 @map("tax_name")
+  taxRate       Decimal?                @map("tax_rate") @db.Decimal(6, 3)
+  amount        Decimal                 @db.Decimal(18, 2)
+  taxAmount     Decimal                 @map("tax_amount") @db.Decimal(18, 2)
+
+  @@index([profileId])
+  @@index([itemId])
+  @@map("recurring_invoice_lines")
 }

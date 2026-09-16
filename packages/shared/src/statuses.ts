@@ -162,3 +162,21 @@ const SALES_RECEIPT_ACTION_RULES: Record<SalesReceiptAction, readonly SalesRecei
 export function canPerformSalesReceiptAction(action: SalesReceiptAction, status: SalesReceiptStatus): boolean {
   return SALES_RECEIPT_ACTION_RULES[action].includes(status);
 }
+
+// ---------- Recurring invoices ----------
+
+export const RECURRING_PROFILE_STATUSES = ['active', 'stopped'] as const;
+export type RecurringProfileStatus = (typeof RECURRING_PROFILE_STATUSES)[number];
+
+export const RECURRING_PROFILE_DISPLAY_STATUSES = ['active', 'stopped', 'expired'] as const;
+export type RecurringProfileDisplayStatus = (typeof RECURRING_PROFILE_DISPLAY_STATUSES)[number];
+
+/** An active profile whose next run falls after its end date has nothing left to create. */
+export function getRecurringProfileDisplayStatus(profile: {
+  status: RecurringProfileStatus;
+  endDate: string | null;
+  nextRunDate: string;
+}): RecurringProfileDisplayStatus {
+  if (profile.status === 'active' && profile.endDate !== null && profile.nextRunDate > profile.endDate) return 'expired';
+  return profile.status;
+}
