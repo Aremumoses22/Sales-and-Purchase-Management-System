@@ -91,6 +91,9 @@ model AuditLog {
 
   @@index([entityType, entityId, createdAt])
   @@index([createdAt])
+  /// Audit log filters.
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
   @@map("audit_logs")
 }
 
@@ -356,6 +359,7 @@ model Item {
   billLines BillLine[]
 
   @@index([isActive, name])
+  @@index([preferredVendorId])
   @@map("items")
 }
 
@@ -507,7 +511,10 @@ model Invoice {
   creditNotes        CreditNote[]
 
   @@unique([recurringProfileId, recurringPeriodDate])
-  @@index([customerId])
+  /// Receivables per customer only count sent invoices.
+  @@index([customerId, status])
+  /// Reports and the dashboard read sent invoices by date.
+  @@index([status, invoiceDate])
   @@index([status, dueDate])
   @@index([invoiceDate])
   @@map("invoices")
@@ -566,6 +573,7 @@ model PaymentReceived {
 
   @@index([customerId])
   @@index([paymentDate])
+  @@index([paymentModeId])
   @@map("payments_received")
 }
 
@@ -649,7 +657,8 @@ model CreditNote {
   applications CreditApplication[]
   refunds      CreditNoteRefund[]
 
-  @@index([customerId])
+  /// Unused credits per customer only count open credit notes.
+  @@index([customerId, status])
   @@index([invoiceId])
   @@index([status])
   @@index([creditNoteDate])
@@ -756,7 +765,9 @@ model SalesReceipt {
   lines SalesReceiptLine[]
 
   @@index([customerId])
-  @@index([status])
+  /// Reports and the dashboard read completed receipts by date.
+  @@index([status, receiptDate])
+  @@index([paymentModeId])
   @@index([receiptDate])
   @@map("sales_receipts")
 }
@@ -960,6 +971,8 @@ model Bill {
 
   @@unique([vendorId, billNumber])
   @@index([status, dueDate])
+  /// Payables per vendor only count open bills.
+  @@index([vendorId, status])
   @@index([billDate])
   @@map("bills")
 }
@@ -1014,6 +1027,7 @@ model PaymentMade {
 
   @@index([vendorId])
   @@index([paymentDate])
+  @@index([paymentModeId])
   @@map("payments_made")
 }
 

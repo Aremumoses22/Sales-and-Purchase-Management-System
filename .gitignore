@@ -22,3 +22,4 @@ apps/api/uploads/
 # browser test output
 apps/e2e/playwright-report/
 apps/e2e/test-results/
+apps/api/dist-demo/

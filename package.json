@@ -14,6 +14,7 @@
     "typecheck": "pnpm --filter @spms/shared run build && pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
     "db:migrate": "pnpm --filter @spms/api run db:migrate",
-    "db:seed": "pnpm --filter @spms/api run db:seed"
+    "db:seed": "pnpm --filter @spms/api run db:seed",
+    "db:seed:demo": "pnpm --filter @spms/shared run build && pnpm --filter @spms/api run db:seed:demo"
   }
 }

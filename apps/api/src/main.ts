@@ -3,11 +3,16 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.js';
 import { configureApp, setupSwagger } from './app.setup.js';
-import { config } from './config.js';
+import { assertProductionConfig, config } from './config.js';
+
+assertProductionConfig();
 
 const app = await NestFactory.create<NestExpressApplication>(AppModule);
 configureApp(app);
-setupSwagger(app);
+if (config.apiDocsEnabled) setupSwagger(app);
 app.enableShutdownHooks();
-await app.listen(config.port);
-Logger.log(`API listening on http://localhost:${config.port}/api/v1 (docs: /api/docs)`, 'Bootstrap');
+await app.listen(config.port, config.host);
+Logger.log(
+  `API listening on http://${config.host}:${config.port}/api/v1${config.apiDocsEnabled ? ' (docs: /api/docs)' : ''}`,
+  'Bootstrap',
+);
