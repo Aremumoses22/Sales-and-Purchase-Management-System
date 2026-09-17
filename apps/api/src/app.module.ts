@@ -12,6 +12,7 @@ import { HealthController } from './modules/health/health.controller.js';
 import { InvoicesModule } from './modules/invoices/invoices.module.js';
 import { ItemsModule } from './modules/items/items.module.js';
 import { CreditNotesModule } from './modules/credit-notes/credit-notes.module.js';
+import { DashboardModule } from './modules/dashboard/dashboard.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { SalesReceiptsModule } from './modules/sales-receipts/sales-receipts.module.js';
 import { QuotesModule } from './modules/quotes/quotes.module.js';
@@ -42,6 +43,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     ExpensesModule,
     BillsModule,
     ReportsModule,
+    DashboardModule,
   ],
   controllers: [HealthController, SearchController],
   providers: [

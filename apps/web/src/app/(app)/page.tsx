@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dashboard } from '@/features/dashboard/dashboard';
 import { useCan, useSession } from '@/lib/session';
 
 const SHORTCUTS = [
@@ -47,28 +48,32 @@ export default function HomePage() {
     <div className="space-y-6">
       <PageHeader
         title={`Welcome, ${user.name.split(' ')[0]}`}
-        description="The dashboard with receivables, sales and expense charts arrives with Module 12."
+        description={can('dashboard:view') ? 'Here is how the business is doing.' : 'Jump to the areas you work in.'}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {shortcuts.map((shortcut) => (
-          <Card key={shortcut.href}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <shortcut.icon className="size-4 text-muted-foreground" />
-                {shortcut.label}
-              </CardTitle>
-              <CardDescription>{shortcut.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" size="sm" nativeButton={false} render={<Link href={shortcut.href} />}>
-                Open
-                <ArrowRightIcon />
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {can('dashboard:view') ? (
+        <Dashboard />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {shortcuts.map((shortcut) => (
+            <Card key={shortcut.href}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <shortcut.icon className="size-4 text-muted-foreground" />
+                  {shortcut.label}
+                </CardTitle>
+                <CardDescription>{shortcut.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" size="sm" nativeButton={false} render={<Link href={shortcut.href} />}>
+                  Open
+                  <ArrowRightIcon />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

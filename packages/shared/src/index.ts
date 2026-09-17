@@ -18,3 +18,4 @@ export * from './schemas/recurring-invoices.js';
 export * from './schemas/expenses.js';
 export * from './schemas/bills.js';
 export * from './reports.js';
+export * from './dashboard.js';
