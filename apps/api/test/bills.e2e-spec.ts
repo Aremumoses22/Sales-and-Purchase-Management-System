@@ -1,6 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { addDays, todayInTimeZone } from '@spms/shared';
 import type {
+  BillAvailableCreditsDto,
   BillDto,
   BillListItemDto,
   ContactDto,
@@ -144,6 +145,50 @@ describe('Bills and payments made (e2e)', () => {
     expect(moved.allocations.map((allocation) => allocation.bill.id)).toEqual([second.id]);
     expect((await bill(first.id)).balanceDue).toBe('30000.00');
     expect((await bill(second.id)).balanceDue).toBe('10000.00');
+  });
+
+  it('applies unused payments to a later bill from the bill and records vendor refunds', async () => {
+    const vendor = await newVendor();
+    const advance = (await pay(vendor, '30000', []).expect(201)).body as PaymentMadeDto;
+    expect(advance.unusedAmount).toBe('30000.00');
+
+    const later = await newBill(vendor, '12000');
+    const credits = (await admin.get(`${API}/bills/${later.id}/available-credits`).expect(200)).body as BillAvailableCreditsDto;
+    expect(credits).toEqual({
+      payments: [{ id: advance.id, number: advance.number, paymentDate: today, unusedAmount: '30000.00' }],
+      total: '30000.00',
+    });
+
+    const beyond = await admin.post(`${API}/bills/${later.id}/apply-credits`).send({ payments: [{ paymentId: advance.id, amount: '12000.01' }] }).expect(400);
+    expect(beyond.body.error.details[0]).toMatchObject({ path: 'payments' });
+
+    const applied = (await admin.post(`${API}/bills/${later.id}/apply-credits`).send({ payments: [{ paymentId: advance.id, amount: '12000' }] }).expect(200))
+      .body as BillDto;
+    expect(applied).toMatchObject({ amountPaid: '12000.00', balanceDue: '0.00', displayStatus: 'paid' });
+    expect(applied.payments).toEqual([expect.objectContaining({ paymentId: advance.id, amount: '12000.00' })]);
+    expect(await summary(vendor)).toEqual({ outstandingPayables: '0.00', unusedCredits: '18000.00' });
+
+    const tooMuch = await admin.post(`${API}/payments-made/${advance.id}/refunds`).send({ refundDate: today, amount: '18000.01' }).expect(400);
+    expect(tooMuch.body.error.details[0]).toMatchObject({ path: 'amount' });
+    const refunded = (
+      await admin.post(`${API}/payments-made/${advance.id}/refunds`).send({ refundDate: today, amount: '8000', paymentModeId: bank.id, referenceNumber: 'RF-77' }).expect(201)
+    ).body as PaymentMadeDto;
+    expect(refunded).toMatchObject({ amountApplied: '12000.00', amountRefunded: '8000.00', unusedAmount: '10000.00' });
+    expect(refunded.refunds).toEqual([expect.objectContaining({ amount: '8000.00', referenceNumber: 'RF-77', paymentMode: { id: bank.id, name: 'Bank Transfer' } })]);
+    expect(await summary(vendor)).toEqual({ outstandingPayables: '0.00', unusedCredits: '10000.00' });
+
+    // The payment can no longer be cut below what was applied and refunded.
+    const lowered = await admin
+      .put(`${API}/payments-made/${advance.id}`)
+      .send({ vendorId: vendor.id, paymentDate: today, amount: '15000', allocations: [{ billId: later.id, amount: '12000' }] })
+      .expect(400);
+    expect(lowered.body.error.details[0]).toMatchObject({ path: 'amount' });
+
+    const restored = (await admin.delete(`${API}/payments-made/${advance.id}/refunds/${refunded.refunds[0]?.id}`).expect(200)).body as PaymentMadeDto;
+    expect(restored.unusedAmount).toBe('18000.00');
+
+    const sales = await signInAsRole(app, 'Sales');
+    await sales.post(`${API}/payments-made/${advance.id}/refunds`).send({ refundDate: today, amount: '1' }).expect(403);
   });
 
   it('lists with overdue status tabs, searches and protects vendors in use', async () => {

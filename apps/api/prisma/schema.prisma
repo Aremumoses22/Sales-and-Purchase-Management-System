@@ -40,6 +40,8 @@ model User {
   billsCreated             Bill[]                    @relation("BillCreatedBy")
   paymentsMadeCreated      PaymentMade[]             @relation("PaymentMadeCreatedBy")
 
+  vendorRefundsCreated PaymentMadeRefund[] @relation("PaymentMadeRefundCreatedBy")
+
   @@map("users")
 }
 
@@ -191,6 +193,8 @@ model PaymentMode {
   expenses         Expense[]
 
   paymentsMade PaymentMade[]
+
+  paymentMadeRefunds PaymentMadeRefund[]
 
   @@map("payment_modes")
 }
@@ -997,14 +1001,16 @@ model PaymentMade {
   paymentMode     PaymentMode? @relation(fields: [paymentModeId], references: [id], onDelete: SetNull)
   referenceNumber String?      @map("reference_number")
   notes           String?
-  /// Sum of allocations; the unused amount is amount - applied.
+  /// Sum of allocations and refunds; the unused amount is amount - applied - refunded.
   amountApplied   Decimal      @default(0) @map("amount_applied") @db.Decimal(18, 2)
+  amountRefunded  Decimal      @default(0) @map("amount_refunded") @db.Decimal(18, 2)
   createdById     String?      @map("created_by_id") @db.Uuid
   createdBy       User?        @relation("PaymentMadeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 
   allocations BillPaymentAllocation[]
+  refunds     PaymentMadeRefund[]
 
   @@index([vendorId])
   @@index([paymentDate])
@@ -1023,4 +1029,23 @@ model BillPaymentAllocation {
   @@unique([paymentId, billId])
   @@index([billId])
   @@map("bill_payment_allocations")
+}
+
+/// Money a vendor gave back from an unused payment.
+model PaymentMadeRefund {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  paymentId       String       @map("payment_id") @db.Uuid
+  payment         PaymentMade  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  refundDate      DateTime     @map("refund_date") @db.Date
+  amount          Decimal      @db.Decimal(18, 2)
+  paymentModeId   String?      @map("payment_mode_id") @db.Uuid
+  paymentMode     PaymentMode? @relation(fields: [paymentModeId], references: [id], onDelete: SetNull)
+  referenceNumber String?      @map("reference_number")
+  notes           String?
+  createdById     String?      @map("created_by_id") @db.Uuid
+  createdBy       User?        @relation("PaymentMadeRefundCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@index([paymentId])
+  @@map("payment_made_refunds")
 }

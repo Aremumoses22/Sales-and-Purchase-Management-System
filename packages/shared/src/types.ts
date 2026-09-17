@@ -680,6 +680,9 @@ export interface PaymentMadeListItemDto {
 export interface PaymentMadeDto extends Omit<PaymentMadeListItemDto, 'vendor'> {
   notes: string | null;
   amountApplied: string;
+  amountRefunded: string;
+  /** Money the vendor gave back from the unused part of this payment. */
+  refunds: PaymentRefundDto[];
   allocations: {
     id: string;
     amount: string;
@@ -689,6 +692,12 @@ export interface PaymentMadeDto extends Omit<PaymentMadeListItemDto, 'vendor'> {
   createdBy: NamedRef | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Unused payments made to the bill's vendor, ready to apply to the bill. */
+export interface BillAvailableCreditsDto {
+  payments: { id: string; number: string; paymentDate: string; unusedAmount: string }[];
+  total: string;
 }
 
 /** A bill that can still take a payment. */

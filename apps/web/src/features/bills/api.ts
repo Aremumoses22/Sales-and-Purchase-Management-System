@@ -1,7 +1,9 @@
 'use client';
 
 import type {
+  ApplyBillCreditsInput,
   AuditLogDto,
+  BillAvailableCreditsDto,
   BillDto,
   BillInput,
   BillListItemDto,
@@ -10,6 +12,7 @@ import type {
   PaymentMadeDto,
   PaymentMadeInput,
   PaymentMadeListItemDto,
+  PaymentRefundInput,
   StatusCountsDto,
 } from '@spms/shared';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -117,4 +120,36 @@ export function useSavePaymentMade() {
 export function useDeletePaymentMade() {
   const invalidate = useInvalidatePurchases();
   return useMutation({ mutationFn: (id: string) => api.delete(`/payments-made/${id}`), onSuccess: () => invalidate() });
+}
+
+export function useAddPaymentMadeRefund() {
+  const invalidate = useInvalidatePurchases();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: PaymentRefundInput }) => api.post<PaymentMadeDto>(`/payments-made/${id}/refunds`, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useRemovePaymentMadeRefund() {
+  const invalidate = useInvalidatePurchases();
+  return useMutation({
+    mutationFn: ({ id, refundId }: { id: string; refundId: string }) => api.delete<PaymentMadeDto>(`/payments-made/${id}/refunds/${refundId}`),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useBillAvailableCredits(billId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...paymentsMadeKey, 'available-credits', billId],
+    queryFn: () => api.get<BillAvailableCreditsDto>(`/bills/${billId}/available-credits`),
+    enabled,
+  });
+}
+
+export function useApplyBillCredits() {
+  const invalidate = useInvalidatePurchases();
+  return useMutation({
+    mutationFn: ({ billId, input }: { billId: string; input: ApplyBillCreditsInput }) => api.post<BillDto>(`/bills/${billId}/apply-credits`, input),
+    onSuccess: () => invalidate(),
+  });
 }

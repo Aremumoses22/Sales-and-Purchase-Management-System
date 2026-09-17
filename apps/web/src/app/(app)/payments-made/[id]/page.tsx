@@ -1,19 +1,27 @@
 'use client';
 
 import { toDecimal } from '@spms/shared';
-import { Loader2Icon, MoreHorizontalIcon, PencilIcon } from 'lucide-react';
+import { Loader2Icon, MoreHorizontalIcon, PencilIcon, Trash2Icon, Undo2Icon } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DocumentListPane } from '@/components/documents/document-list-pane';
+import { RefundDialog } from '@/components/documents/refund-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { HistoryPanel } from '@/components/history-panel';
 import { Money } from '@/components/money';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useDeletePaymentMade, usePaymentMade, usePaymentMadeHistory, usePaymentsMade } from '@/features/bills/api';
+import {
+  useAddPaymentMadeRefund,
+  useDeletePaymentMade,
+  usePaymentMade,
+  usePaymentMadeHistory,
+  usePaymentsMade,
+  useRemovePaymentMadeRefund,
+} from '@/features/bills/api';
 import { formatDate } from '@/lib/format';
 import { showApiError } from '@/lib/forms';
 import { useCan, useOrganization } from '@/lib/session';
@@ -36,6 +44,9 @@ export default function PaymentMadeDetailPage() {
   const list = usePaymentsMade({ pageSize: 50, sort: '-date' });
   const history = usePaymentMadeHistory(id);
   const remove = useDeletePaymentMade();
+  const addRefund = useAddPaymentMadeRefund();
+  const removeRefund = useRemovePaymentMadeRefund();
+  const [refunding, setRefunding] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const onDelete = async () => {
@@ -89,6 +100,12 @@ export default function PaymentMadeDetailPage() {
                     Edit
                   </Button>
                 ) : null}
+                {can('payments_made:edit') && toDecimal(payment.unusedAmount).gt(0) ? (
+                  <Button variant="outline" size="sm" onClick={() => setRefunding(true)}>
+                    <Undo2Icon />
+                    Refund
+                  </Button>
+                ) : null}
                 {can('payments_made:delete') ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger render={<Button variant="outline" size="icon-sm" aria-label="More actions" />}>
@@ -121,6 +138,9 @@ export default function PaymentMadeDetailPage() {
                   <Detail label="Reference#">{payment.referenceNumber}</Detail>
                   <Detail label="Used for bills">
                     <Money value={payment.amountApplied} />
+                  </Detail>
+                  <Detail label="Refunded by vendor">
+                    <Money value={payment.amountRefunded} />
                   </Detail>
                   <Detail label="Unused">
                     <Money value={payment.unusedAmount} />
@@ -171,6 +191,46 @@ export default function PaymentMadeDetailPage() {
                 )}
               </div>
 
+              {payment.refunds.length > 0 ? (
+                <div className="mx-auto max-w-[210mm] rounded-xl border bg-card p-5">
+                  <h2 className="mb-3 text-sm font-semibold">Refunds from the vendor</h2>
+                  <ul className="divide-y text-sm">
+                    {payment.refunds.map((refund) => (
+                      <li key={refund.id} className="flex items-center justify-between gap-3 py-2">
+                        <span>
+                          {formatDate(refund.refundDate, organization)}
+                          <span className="text-muted-foreground">
+                            {refund.paymentMode ? ` · ${refund.paymentMode.name}` : ''}
+                            {refund.referenceNumber ? ` · ${refund.referenceNumber}` : ''}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <Money value={refund.amount} />
+                          {can('payments_made:edit') ? (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Delete refund"
+                              disabled={removeRefund.isPending}
+                              onClick={async () => {
+                                try {
+                                  await removeRefund.mutateAsync({ id, refundId: refund.id });
+                                  toast.success('Refund deleted');
+                                } catch (error) {
+                                  showApiError(error);
+                                }
+                              }}
+                            >
+                              <Trash2Icon />
+                            </Button>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               <div className="mx-auto max-w-[210mm] rounded-xl border bg-card p-5">
                 <h2 className="mb-4 text-sm font-semibold">History</h2>
                 <HistoryPanel entries={history.data} isLoading={history.isPending} />
@@ -179,6 +239,17 @@ export default function PaymentMadeDetailPage() {
           </>
         )}
       </section>
+
+      {refunding && payment ? (
+        <RefundDialog
+          title="Record vendor refund"
+          description="Record money the vendor gave back from the unused part of this payment."
+          defaultAmount={payment.unusedAmount}
+          busy={addRefund.isPending}
+          onSubmit={(input) => addRefund.mutateAsync({ id, input })}
+          onClose={() => setRefunding(false)}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={confirmDelete}

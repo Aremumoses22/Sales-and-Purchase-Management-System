@@ -82,3 +82,18 @@ export const openBillsQuerySchema = z.object({
   paymentId: z.uuid().optional(),
 });
 export type OpenBillsQuery = z.output<typeof openBillsQuerySchema>;
+
+/** Applies unused payments made to one bill. */
+export const applyBillCreditsSchema = z
+  .object({
+    payments: z
+      .array(z.object({ paymentId: idSchema, amount: positiveMoney }))
+      .min(1, 'Enter an amount to apply')
+      .max(50),
+  })
+  .refine((data) => new Set(data.payments.map((entry) => entry.paymentId)).size === data.payments.length, {
+    message: 'Each payment can appear only once',
+    path: ['payments'],
+  });
+export type ApplyBillCreditsInput = z.input<typeof applyBillCreditsSchema>;
+export type ApplyBillCreditsOutput = z.output<typeof applyBillCreditsSchema>;

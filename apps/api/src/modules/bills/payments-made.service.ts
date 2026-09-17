@@ -4,8 +4,12 @@ import {
   todayInTimeZone,
   toDecimal,
   type AuditLogDto,
+  type ApplyBillCreditsOutput,
+  type BillAvailableCreditsDto,
+  type BillDto,
   type Decimal,
   type NumericInput,
+  type PaymentRefundOutput,
   type OpenBillDto,
   type OpenBillsQuery,
   type Paginated,
@@ -16,7 +20,7 @@ import {
 } from '@spms/shared';
 import { AuditService } from '../../audit/audit.service.js';
 import { diffRecords } from '../../audit/diff.js';
-import { fieldError, notFound } from '../../common/app-exception.js';
+import { conflict, fieldError, notFound } from '../../common/app-exception.js';
 import { pageArgs, paginated, parseSort } from '../../common/pagination.js';
 import { getRequestContext } from '../../common/request-context.js';
 import { fromDateOnly, money, toDateOnly, toIso } from '../../common/serialize.js';
@@ -34,13 +38,14 @@ const PAYMENT_INCLUDE = {
     include: { bill: { select: { id: true, billNumber: true, billDate: true, total: true, balanceDue: true } } },
     orderBy: { createdAt: 'asc' },
   },
+  refunds: { include: { paymentMode: { select: { id: true, name: true } } }, orderBy: { createdAt: 'asc' } },
   createdBy: { select: { id: true, name: true } },
 } satisfies Prisma.PaymentMadeInclude;
 
 type PaymentDetail = Prisma.PaymentMadeGetPayload<{ include: typeof PAYMENT_INCLUDE }>;
 
-function unusedOf(payment: { amount: NumericInput; amountApplied: NumericInput }): Decimal {
-  return toDecimal(payment.amount).minus(toDecimal(payment.amountApplied));
+function unusedOf(payment: { amount: NumericInput; amountApplied: NumericInput; amountRefunded: NumericInput }): Decimal {
+  return toDecimal(payment.amount).minus(toDecimal(payment.amountApplied)).minus(toDecimal(payment.amountRefunded));
 }
 
 function toPaymentDto(payment: PaymentDetail): PaymentMadeDto {
@@ -52,8 +57,18 @@ function toPaymentDto(payment: PaymentDetail): PaymentMadeDto {
     paymentMode: payment.paymentMode,
     amount: money(payment.amount),
     amountApplied: money(payment.amountApplied),
+    amountRefunded: money(payment.amountRefunded),
     unusedAmount: money(unusedOf(payment)),
     notes: payment.notes,
+    refunds: payment.refunds.map((refund) => ({
+      id: refund.id,
+      refundDate: toDateOnly(refund.refundDate),
+      amount: money(refund.amount),
+      paymentMode: refund.paymentMode,
+      referenceNumber: refund.referenceNumber,
+      notes: refund.notes,
+      createdAt: toIso(refund.createdAt),
+    })),
     allocations: payment.allocations.map((allocation) => ({
       id: allocation.id,
       amount: money(allocation.amount),
@@ -199,6 +214,12 @@ export class PaymentsMadeService {
     const before = await this.find(id);
     if (input.vendorId !== before.vendorId) await this.requireVendor(input.vendorId);
     await this.requirePaymentMode(input.paymentModeId);
+    const needed = input.allocations
+      .reduce<Decimal>((total, allocation) => total.plus(toDecimal(allocation.amount)), toDecimal(0))
+      .plus(toDecimal(before.amountRefunded));
+    if (needed.gt(toDecimal(input.amount))) {
+      throw fieldError('AMOUNT_TOO_LOW', 'amount', `The amount must cover the ${money(needed)} applied to bills and refunded`);
+    }
     await this.prisma.$transaction(async (tx) => {
       await this.lock(tx, id);
       const previous = await tx.billPaymentAllocation.findMany({ where: { paymentId: id }, select: { billId: true } });
@@ -239,6 +260,119 @@ export class PaymentsMadeService {
     });
   }
 
+  /** Records money the vendor gave back from the unused part of a payment. */
+  async addRefund(id: string, input: PaymentRefundOutput): Promise<PaymentMadeDto> {
+    await this.requirePaymentMode(input.paymentModeId);
+    await this.prisma.$transaction(async (tx) => {
+      await this.lock(tx, id);
+      const payment = await tx.paymentMade.findUniqueOrThrow({ where: { id } });
+      const unused = unusedOf(payment);
+      if (toDecimal(input.amount).gt(unused)) {
+        throw fieldError('EXCEEDS_UNUSED', 'amount', `Only ${money(unused)} of this payment is unused`);
+      }
+      await tx.paymentMadeRefund.create({
+        data: {
+          paymentId: id,
+          refundDate: fromDateOnly(input.refundDate),
+          amount: input.amount,
+          paymentModeId: input.paymentModeId,
+          referenceNumber: input.referenceNumber,
+          notes: input.notes,
+          createdById: getRequestContext()?.userId ?? null,
+        },
+      });
+      await this.refreshPayment(tx, id);
+      await this.audit.record(
+        { action: 'refunded', entityType: 'payment_made', entityId: id, summary: `${money(input.amount)} of payment ${payment.number} refunded by the vendor` },
+        tx,
+      );
+    });
+    return this.get(id);
+  }
+
+  async removeRefund(id: string, refundId: string): Promise<PaymentMadeDto> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.lock(tx, id);
+      const refund = await tx.paymentMadeRefund.findFirst({ where: { id: refundId, paymentId: id }, include: { payment: true } });
+      if (!refund) throw notFound('Refund');
+      await tx.paymentMadeRefund.delete({ where: { id: refundId } });
+      await this.refreshPayment(tx, id);
+      await this.audit.record(
+        { action: 'updated', entityType: 'payment_made', entityId: id, summary: `Refund of ${money(refund.amount)} on payment ${refund.payment.number} deleted` },
+        tx,
+      );
+    });
+    return this.get(id);
+  }
+
+  /** Unused payments made to the bill's vendor, oldest first. */
+  async availableCredits(billId: string): Promise<BillAvailableCreditsDto> {
+    const bill = await this.prisma.bill.findUnique({ where: { id: billId }, select: { vendorId: true } });
+    if (!bill) throw notFound('Bill');
+    const payments = await this.prisma.paymentMade.findMany({
+      where: { vendorId: bill.vendorId },
+      orderBy: [{ paymentDate: 'asc' }, { number: 'asc' }],
+    });
+    const available = payments.map((payment) => ({ payment, unused: unusedOf(payment) })).filter(({ unused }) => unused.gt(0));
+    return {
+      payments: available.map(({ payment, unused }) => ({
+        id: payment.id,
+        number: payment.number,
+        paymentDate: toDateOnly(payment.paymentDate),
+        unusedAmount: money(unused),
+      })),
+      total: money(available.reduce<Decimal>((total, { unused }) => total.plus(unused), toDecimal(0))),
+    };
+  }
+
+  /** Uses unused payments made on a bill, without editing each payment. */
+  async applyCredits(billId: string, input: ApplyBillCreditsOutput): Promise<BillDto> {
+    const requested = input.payments.reduce<Decimal>((total, entry) => total.plus(toDecimal(entry.amount)), toDecimal(0));
+    await this.prisma.$transaction(async (tx) => {
+      // Lock payments before the bill, the same order payment edits use.
+      const ordered = input.payments.map((entry, index) => ({ ...entry, index })).sort((a, b) => a.paymentId.localeCompare(b.paymentId));
+      for (const entry of ordered) await this.lock(tx, entry.paymentId);
+
+      const bill = await this.bills.lockForPayment(tx, billId);
+      if (!bill) throw notFound('Bill');
+      if (bill.status === 'void') throw conflict('BILL_VOID', 'Credits cannot be applied to a void bill');
+      if (requested.gt(toDecimal(bill.balanceDue))) {
+        throw fieldError('EXCEEDS_BALANCE', 'payments', `Only ${money(bill.balanceDue)} is due on bill ${bill.billNumber}`);
+      }
+
+      for (const entry of ordered) {
+        const payment = await tx.paymentMade.findUniqueOrThrow({ where: { id: entry.paymentId } });
+        if (payment.vendorId !== bill.vendorId) {
+          throw fieldError('PAYMENT_NOT_AVAILABLE', `payments.${entry.index}.paymentId`, "This payment is not to the bill's vendor");
+        }
+        const unused = unusedOf(payment);
+        if (toDecimal(entry.amount).gt(unused)) {
+          throw fieldError('EXCEEDS_UNUSED', `payments.${entry.index}.amount`, `Only ${money(unused)} of payment ${payment.number} is unused`);
+        }
+        const existing = await tx.billPaymentAllocation.findUnique({ where: { paymentId_billId: { paymentId: payment.id, billId } } });
+        if (existing) {
+          await tx.billPaymentAllocation.update({
+            where: { id: existing.id },
+            data: { amount: toDecimal(existing.amount).plus(toDecimal(entry.amount)).toFixed(2) },
+          });
+        } else {
+          await tx.billPaymentAllocation.create({ data: { paymentId: payment.id, billId, amount: entry.amount } });
+        }
+        await this.refreshPayment(tx, payment.id);
+        await this.audit.record(
+          { action: 'applied', entityType: 'payment_made', entityId: payment.id, summary: `${money(entry.amount)} of payment ${payment.number} applied to bill ${bill.billNumber}` },
+          tx,
+        );
+      }
+      await this.bills.refreshBalances(tx, [billId]);
+      await this.audit.record(
+        { action: 'credits_applied', entityType: 'bill', entityId: billId, summary: `${money(requested)} of earlier payments applied to bill ${bill.billNumber}` },
+        tx,
+      );
+    });
+    return this.bills.get(billId);
+  }
+
   async history(id: string): Promise<AuditLogDto[]> {
     await this.find(id);
     return this.audit.history('payment_made', id);
@@ -263,8 +397,22 @@ export class PaymentsMadeService {
       });
       await this.bills.refreshBalances(tx, allocations.map((allocation) => allocation.billId));
     }
-    const { _sum } = await tx.billPaymentAllocation.aggregate({ where: { paymentId: payment.id }, _sum: { amount: true } });
-    await tx.paymentMade.update({ where: { id: payment.id }, data: { amountApplied: toDecimal(_sum.amount).toFixed(2) } });
+    await this.refreshPayment(tx, payment.id);
+  }
+
+  /** Keeps a payment's applied and refunded totals in step with its allocations and refunds. */
+  private async refreshPayment(tx: Tx, id: string): Promise<void> {
+    const [allocated, refunded, payment] = await Promise.all([
+      tx.billPaymentAllocation.aggregate({ where: { paymentId: id }, _sum: { amount: true } }),
+      tx.paymentMadeRefund.aggregate({ where: { paymentId: id }, _sum: { amount: true } }),
+      tx.paymentMade.findUniqueOrThrow({ where: { id }, select: { amount: true } }),
+    ]);
+    const applied = toDecimal(allocated._sum.amount);
+    const refundedTotal = toDecimal(refunded._sum.amount);
+    if (applied.plus(refundedTotal).gt(toDecimal(payment.amount))) {
+      throw fieldError('AMOUNT_TOO_LOW', 'amount', 'The payment is not large enough for what has been applied and refunded');
+    }
+    await tx.paymentMade.update({ where: { id }, data: { amountApplied: applied.toFixed(2), amountRefunded: refundedTotal.toFixed(2) } });
   }
 
   private async lock(tx: Tx, id: string): Promise<void> {

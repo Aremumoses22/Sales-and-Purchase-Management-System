@@ -360,13 +360,18 @@ export class ReportsService {
   /** What the business owed each vendor at the end of `asOf`: opening balance plus open bills less payments made. */
   async vendorBalances(query: ReportAsOfQuery): Promise<VendorBalancesReport> {
     const end = fromDateOnly(query.asOf);
-    const [vendors, bills, payments] = await Promise.all([
+    const [vendors, bills, payments, refunds] = await Promise.all([
       this.prisma.contact.findMany({ where: { type: 'vendor' }, select: { id: true, displayName: true, openingBalance: true } }),
       this.prisma.bill.groupBy({ by: ['vendorId'], where: { status: 'open', billDate: { lte: end } }, _sum: { total: true } }),
       this.prisma.paymentMade.groupBy({ by: ['vendorId'], where: { paymentDate: { lte: end } }, _sum: { amount: true } }),
+      this.prisma.paymentMadeRefund.findMany({ where: { refundDate: { lte: end } }, select: { amount: true, payment: { select: { vendorId: true } } } }),
     ]);
     const billed = new Map(bills.map((row) => [row.vendorId, toDecimal(row._sum.total)]));
     const paid = new Map(payments.map((row) => [row.vendorId, toDecimal(row._sum.amount)]));
+    // Money a vendor refunded is no longer paid to them.
+    for (const refund of refunds) {
+      paid.set(refund.payment.vendorId, (paid.get(refund.payment.vendorId) ?? zero()).minus(toDecimal(refund.amount)));
+    }
     const rows = vendors
       .map((vendor) => {
         const opening = toDecimal(vendor.openingBalance);

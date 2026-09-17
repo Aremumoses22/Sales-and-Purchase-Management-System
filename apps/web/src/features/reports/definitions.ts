@@ -249,7 +249,7 @@ export const REPORTS: ReportDefinition[] = [
       { key: 'balance', header: 'Balance', kind: 'money' },
     ],
     totals: { openingBalance: 'openingBalance', billed: 'billed', paid: 'paid', balance: 'balance' },
-    note: 'Billed counts open bills; paid counts every payment made, including any not yet used on a bill.',
+    note: 'Billed counts open bills; paid counts every payment made, including any not yet used on a bill, less refunds from the vendor.',
   },
 ];
 

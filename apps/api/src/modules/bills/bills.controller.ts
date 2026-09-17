@@ -1,17 +1,21 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
+  applyBillCreditsSchema,
   billListQuerySchema,
   billSchema,
   openBillsQuerySchema,
   paymentMadeListQuerySchema,
   paymentMadeSchema,
+  paymentRefundSchema,
   voidInvoiceSchema,
+  type ApplyBillCreditsOutput,
   type BillListQuery,
   type BillOutput,
   type OpenBillsQuery,
   type PaymentMadeListQuery,
   type PaymentMadeOutput,
+  type PaymentRefundOutput,
 } from '@spms/shared';
 import type { z } from 'zod';
 import { RequirePermissions } from '../../common/decorators.js';
@@ -23,7 +27,24 @@ import { PaymentsMadeService } from './payments-made.service.js';
 @ApiTags('Bills')
 @Controller('bills')
 export class BillsController {
-  constructor(private readonly bills: BillsService) {}
+  constructor(
+    private readonly bills: BillsService,
+    private readonly payments: PaymentsMadeService,
+  ) {}
+
+  @Get(':id/available-credits')
+  @RequirePermissions('bills:view')
+  availableCredits(@Param('id', { schema: uuidParam }) id: string) {
+    return this.payments.availableCredits(id);
+  }
+
+  @Post(':id/apply-credits')
+  @RequirePermissions('payments_made:edit', 'bills:view')
+  @HttpCode(HttpStatus.OK)
+  @ApiZodBody(applyBillCreditsSchema)
+  applyCredits(@Param('id', { schema: uuidParam }) id: string, @Body({ schema: applyBillCreditsSchema }) body: ApplyBillCreditsOutput) {
+    return this.payments.applyCredits(id, body);
+  }
 
   @Get()
   @RequirePermissions('bills:view')
@@ -136,5 +157,18 @@ export class PaymentsMadeController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id', { schema: uuidParam }) id: string) {
     return this.payments.remove(id);
+  }
+
+  @Post(':id/refunds')
+  @RequirePermissions('payments_made:edit')
+  @ApiZodBody(paymentRefundSchema)
+  addRefund(@Param('id', { schema: uuidParam }) id: string, @Body({ schema: paymentRefundSchema }) body: PaymentRefundOutput) {
+    return this.payments.addRefund(id, body);
+  }
+
+  @Delete(':id/refunds/:refundId')
+  @RequirePermissions('payments_made:edit')
+  removeRefund(@Param('id', { schema: uuidParam }) id: string, @Param('refundId', { schema: uuidParam }) refundId: string) {
+    return this.payments.removeRefund(id, refundId);
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { canPerformBillAction, daysBetween, todayInTimeZone } from '@spms/shared';
+import { canPerformBillAction, daysBetween, moneyString, todayInTimeZone, toDecimal, type BillAvailableCreditsDto, type BillDto } from '@spms/shared';
 import { BanknoteArrowUpIcon, CheckCircle2Icon, Loader2Icon, MoreHorizontalIcon, PencilIcon, PrinterIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -22,8 +22,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useBill, useBillHistory, useBills, useDeleteBill, useMarkBillOpen, useVoidBill } from '@/features/bills/api';
+import {
+  useApplyBillCredits,
+  useBill,
+  useBillAvailableCredits,
+  useBillHistory,
+  useBills,
+  useDeleteBill,
+  useMarkBillOpen,
+  useVoidBill,
+} from '@/features/bills/api';
+import { ApiError } from '@/lib/api';
 import { BillPreview } from '@/features/bills/bill-preview';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { showApiError } from '@/lib/forms';
@@ -52,6 +63,129 @@ function VoidDialog({ number, busy, onClose, onConfirm }: { number: string; busy
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ApplyCreditsDialog({ bill, credits, onClose }: { bill: BillDto; credits: BillAvailableCreditsDto; onClose: () => void }) {
+  const organization = useOrganization();
+  const apply = useApplyBillCredits();
+  const [amounts, setAmounts] = useState<Record<string, string>>(() => {
+    // Suggest using the oldest payment first, up to what is due.
+    let remaining = toDecimal(bill.balanceDue);
+    const initial: Record<string, string> = {};
+    for (const payment of credits.payments) {
+      const share = remaining.lt(payment.unusedAmount) ? remaining : toDecimal(payment.unusedAmount);
+      initial[payment.id] = share.gt(0) ? moneyString(share) : '';
+      remaining = remaining.minus(share);
+    }
+    return initial;
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string>();
+  const entries = credits.payments
+    .map((payment) => ({ paymentId: payment.id, amount: (amounts[payment.id] ?? '').trim() }))
+    .filter((entry) => Number(entry.amount) > 0);
+  const total = entries.reduce((sum, entry) => sum.plus(toDecimal(entry.amount)), toDecimal(0));
+
+  const submit = async () => {
+    setErrors({});
+    setFormError(undefined);
+    try {
+      await apply.mutateAsync({ billId: bill.id, input: { payments: entries } });
+      toast.success('Credits applied');
+      onClose();
+    } catch (error) {
+      if (!(error instanceof ApiError)) return showApiError(error);
+      const next: Record<string, string> = {};
+      for (const issue of error.fieldErrors) {
+        const match = /^payments\.(\d+)\./.exec(issue.path);
+        const entry = match ? entries[Number(match[1])] : undefined;
+        if (entry) next[entry.paymentId] = issue.message;
+        else setFormError(issue.message);
+      }
+      setErrors(next);
+      if (!error.fieldErrors.length) setFormError(error.message);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Apply credits to {bill.billNumber}</DialogTitle>
+          <DialogDescription>
+            Balance due: <Money value={bill.balanceDue} />
+          </DialogDescription>
+        </DialogHeader>
+        <table className="w-full text-sm">
+          <thead className="text-xs text-muted-foreground">
+            <tr>
+              <th className="py-1.5 text-left font-medium">Payment</th>
+              <th className="py-1.5 text-right font-medium">Unused</th>
+              <th className="w-36 py-1.5 text-right font-medium">Apply</th>
+            </tr>
+          </thead>
+          <tbody>
+            {credits.payments.map((payment) => (
+              <tr key={payment.id} className="border-t align-top">
+                <td className="py-2">
+                  {payment.number}
+                  <span className="block text-xs text-muted-foreground">{formatDate(payment.paymentDate, organization)}</span>
+                </td>
+                <td className="py-2 text-right">
+                  <Money value={payment.unusedAmount} />
+                </td>
+                <td className="py-1.5">
+                  <Input
+                    inputMode="decimal"
+                    aria-label={`Amount to apply from ${payment.number}`}
+                    className="text-right"
+                    value={amounts[payment.id] ?? ''}
+                    onChange={(event) => setAmounts({ ...amounts, [payment.id]: event.target.value })}
+                  />
+                  {errors[payment.id] ? <p className="mt-1 text-right text-xs text-destructive">{errors[payment.id]}</p> : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-right text-sm">
+          Amount to apply: <Money value={total.toFixed(2)} className="font-semibold" />
+        </p>
+        {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={apply.isPending}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={apply.isPending || entries.length === 0}>
+            {apply.isPending ? <Loader2Icon className="animate-spin" /> : null}
+            Apply credits
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Unused money already paid to this vendor, ready to use on the bill. */
+function AvailableCredits({ bill }: { bill: BillDto }) {
+  const can = useCan();
+  const eligible = can('payments_made:edit') && bill.status !== 'void' && toDecimal(bill.balanceDue).gt(0);
+  const { data } = useBillAvailableCredits(bill.id, eligible);
+  const [open, setOpen] = useState(false);
+  if (!eligible || !data || !toDecimal(data.total).gt(0)) return null;
+  return (
+    <>
+      <div className="mx-auto flex max-w-[210mm] flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-900 ring-1 ring-emerald-600/20">
+        <span>
+          Credits available: <Money value={data.total} className="font-semibold" />
+        </span>
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+          Apply credits
+        </Button>
+      </div>
+      {open ? <ApplyCreditsDialog bill={bill} credits={data} onClose={() => setOpen(false)} /> : null}
+    </>
   );
 }
 
@@ -199,6 +333,8 @@ export default function BillDetailPage() {
                   This bill is a draft. Open it to add it to what you owe and to receive its goods into stock.
                 </p>
               ) : null}
+
+              <AvailableCredits bill={bill} />
 
               <BillPreview bill={bill} />
 

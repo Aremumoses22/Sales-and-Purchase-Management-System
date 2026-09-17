@@ -341,8 +341,11 @@ export class ContactsService {
 
   /** Payments made to a vendor that are not yet used on a bill. */
   private async unusedVendorCredits(vendorId: string): Promise<Decimal> {
-    const { _sum } = await this.prisma.paymentMade.aggregate({ where: { vendorId }, _sum: { amount: true, amountApplied: true } });
-    return toDecimal(_sum.amount).minus(toDecimal(_sum.amountApplied));
+    const { _sum } = await this.prisma.paymentMade.aggregate({
+      where: { vendorId },
+      _sum: { amount: true, amountApplied: true, amountRefunded: true },
+    });
+    return toDecimal(_sum.amount).minus(toDecimal(_sum.amountApplied)).minus(toDecimal(_sum.amountRefunded));
   }
 
   /** What each customer still owes on sent invoices (drafts and void invoices are not owed). */
