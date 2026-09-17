@@ -29,6 +29,14 @@ export class RecurringInvoicesController {
     return this.recurring.statusCounts(query);
   }
 
+  /** Runs the scheduled job now for everything due today; safe to repeat. */
+  @Post('run-due')
+  @RequirePermissions('recurring_invoices:edit', 'invoices:create')
+  @HttpCode(HttpStatus.OK)
+  runDue() {
+    return this.recurring.runDue();
+  }
+
   @Get(':id')
   @RequirePermissions('recurring_invoices:view')
   get(@Param('id', { schema: uuidParam }) id: string) {

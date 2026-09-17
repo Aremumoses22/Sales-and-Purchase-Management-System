@@ -1,6 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import type { NextFunction, Request, Response } from 'express';
 import { AllExceptionsFilter } from './common/exception.filter.js';
 import { requestContextMiddleware } from './common/request-context.js';
 import { createValidationPipe } from './common/validation.js';
@@ -11,6 +12,15 @@ export const API_PREFIX = 'api/v1';
 /** Shared by main.ts and the e2e tests so both run the exact same pipeline. */
 export function configureApp(app: NestExpressApplication): void {
   app.setGlobalPrefix(API_PREFIX);
+  app.disable('x-powered-by');
+  // Baseline security headers. The API only serves JSON and uploaded files, so it never needs framing or sniffing.
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    next();
+  });
   // Browsers reach the API through the Next.js server on the same machine; trust it for client IPs.
   app.set('trust proxy', 'loopback');
   app.useBodyParser('json', { limit: '1mb' });

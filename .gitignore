@@ -18,3 +18,7 @@ apps/web/next-env.d.ts
 
 # uploaded files (logos, receipts)
 apps/api/uploads/
+
+# browser test output
+apps/e2e/playwright-report/
+apps/e2e/test-results/

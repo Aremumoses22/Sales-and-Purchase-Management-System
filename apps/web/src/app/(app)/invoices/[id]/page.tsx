@@ -65,7 +65,12 @@ import { formatDate, formatDateTime } from '@/lib/format';
 import { showApiError } from '@/lib/forms';
 import { useCan, useOrganization } from '@/lib/session';
 
-function VoidDialog({ invoiceNumber, busy, onClose, onConfirm }: {
+function VoidDialog({
+  invoiceNumber,
+  busy,
+  onClose,
+  onConfirm,
+}: {
   invoiceNumber: string;
   busy: boolean;
   onClose: () => void;
@@ -78,11 +83,17 @@ function VoidDialog({ invoiceNumber, busy, onClose, onConfirm }: {
         <DialogHeader>
           <DialogTitle>Void invoice {invoiceNumber}?</DialogTitle>
           <DialogDescription>
-            The invoice stays on record but no longer counts as owed, and any stock it took is returned.
+            The invoice stays on record but no longer counts as owed, and any stock it took is
+            returned.
           </DialogDescription>
         </DialogHeader>
         <Field label="Reason" htmlFor="void-reason" hint="Optional, recorded in the history.">
-          <Textarea id="void-reason" rows={3} value={reason} onChange={(event) => setReason(event.target.value)} />
+          <Textarea
+            id="void-reason"
+            rows={3}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
         </Field>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>
@@ -98,7 +109,13 @@ function VoidDialog({ invoiceNumber, busy, onClose, onConfirm }: {
   );
 }
 
-type CreditSource = { kind: 'payment' | 'creditNote'; id: string; number: string; date: string; available: string };
+type CreditSource = {
+  kind: 'payment' | 'creditNote';
+  id: string;
+  number: string;
+  date: string;
+  available: string;
+};
 
 function ApplyCreditsDialog({
   invoice,
@@ -140,7 +157,10 @@ function ApplyCreditsDialog({
         invoiceId: invoice.id,
         input: {
           payments: payments.map((entry) => ({ paymentId: entry.source.id, amount: entry.amount })),
-          creditNotes: creditNotes.map((entry) => ({ creditNoteId: entry.source.id, amount: entry.amount })),
+          creditNotes: creditNotes.map((entry) => ({
+            creditNoteId: entry.source.id,
+            amount: entry.amount,
+          })),
         },
       });
       toast.success('Credits applied');
@@ -150,7 +170,9 @@ function ApplyCreditsDialog({
       const next: Record<string, string> = {};
       for (const issue of error.fieldErrors) {
         const match = /^(payments|creditNotes)\.(\d+)\./.exec(issue.path);
-        const entry = match ? (match[1] === 'payments' ? payments : creditNotes)[Number(match[2])] : undefined;
+        const entry = match
+          ? (match[1] === 'payments' ? payments : creditNotes)[Number(match[2])]
+          : undefined;
         if (entry) next[entry.source.id] = issue.message;
         else setFormError(issue.message);
       }
@@ -182,7 +204,8 @@ function ApplyCreditsDialog({
                 <td className="py-2">
                   {source.number}
                   <span className="block text-xs text-muted-foreground">
-                    {source.kind === 'payment' ? 'Unused payment' : 'Credit note'} · {formatDate(source.date, organization)}
+                    {source.kind === 'payment' ? 'Unused payment' : 'Credit note'} ·{' '}
+                    {formatDate(source.date, organization)}
                   </span>
                 </td>
                 <td className="py-2 text-right">
@@ -194,9 +217,13 @@ function ApplyCreditsDialog({
                     aria-label={`Amount to apply from ${source.number}`}
                     className="text-right"
                     value={amounts[source.id] ?? ''}
-                    onChange={(event) => setAmounts({ ...amounts, [source.id]: event.target.value })}
+                    onChange={(event) =>
+                      setAmounts({ ...amounts, [source.id]: event.target.value })
+                    }
                   />
-                  {errors[source.id] ? <p className="mt-1 text-right text-xs text-destructive">{errors[source.id]}</p> : null}
+                  {errors[source.id] ? (
+                    <p className="mt-1 text-right text-xs text-destructive">{errors[source.id]}</p>
+                  ) : null}
                 </td>
               </tr>
             ))}
@@ -225,7 +252,10 @@ function AvailableCredits({ invoice }: { invoice: InvoiceDto }) {
   const can = useCan();
   const canUsePayments = can('payments_received:edit');
   const canUseCreditNotes = can('credit_notes:edit');
-  const eligible = (canUsePayments || canUseCreditNotes) && invoice.status !== 'void' && toDecimal(invoice.balanceDue).gt(0);
+  const eligible =
+    (canUsePayments || canUseCreditNotes) &&
+    invoice.status !== 'void' &&
+    toDecimal(invoice.balanceDue).gt(0);
   const { data } = useAvailableCredits(invoice.id, eligible);
   const [open, setOpen] = useState(false);
 
@@ -251,7 +281,10 @@ function AvailableCredits({ invoice }: { invoice: InvoiceDto }) {
         }))
       : []),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number));
-  const total = sources.reduce((sum, source) => sum.plus(toDecimal(source.available)), toDecimal(0));
+  const total = sources.reduce(
+    (sum, source) => sum.plus(toDecimal(source.available)),
+    toDecimal(0),
+  );
   if (!total.gt(0)) return null;
 
   return (
@@ -264,7 +297,9 @@ function AvailableCredits({ invoice }: { invoice: InvoiceDto }) {
           Apply credits
         </Button>
       </div>
-      {open ? <ApplyCreditsDialog invoice={invoice} sources={sources} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <ApplyCreditsDialog invoice={invoice} sources={sources} onClose={() => setOpen(false)} />
+      ) : null}
     </>
   );
 }
@@ -346,7 +381,11 @@ export default function InvoiceDetailPage() {
 
       <section className="flex min-w-0 flex-1 flex-col">
         {isError ? (
-          <EmptyState title="Invoice not found" description="It may have been deleted." className="flex-1" />
+          <EmptyState
+            title="Invoice not found"
+            description="It may have been deleted."
+            className="flex-1"
+          />
         ) : isPending || !invoice ? (
           <Loader2Icon className="mx-auto mt-16 size-6 animate-spin text-muted-foreground" />
         ) : (
@@ -359,7 +398,12 @@ export default function InvoiceDetailPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 {can('invoices:edit') && canPerformInvoiceAction('edit', invoice) ? (
-                  <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/invoices/${id}/edit`} />}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    nativeButton={false}
+                    render={<Link href={`/invoices/${id}/edit`} />}
+                  >
                     <PencilIcon />
                     Edit
                   </Button>
@@ -370,12 +414,17 @@ export default function InvoiceDetailPage() {
                     Mark as sent
                   </Button>
                 ) : null}
-                {can('payments_received:create') && canPerformInvoiceAction('recordPayment', invoice) ? (
+                {can('payments_received:create') &&
+                canPerformInvoiceAction('recordPayment', invoice) ? (
                   <Button
                     size="sm"
                     variant={invoice.status === 'draft' ? 'outline' : 'default'}
                     nativeButton={false}
-                    render={<Link href={`/payments-received/new?customerId=${invoice.customer.id}&invoiceId=${id}`} />}
+                    render={
+                      <Link
+                        href={`/payments-received/new?customerId=${invoice.customer.id}&invoiceId=${id}`}
+                      />
+                    }
                   >
                     <BanknoteArrowDownIcon />
                     Record payment
@@ -384,49 +433,64 @@ export default function InvoiceDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(`/print/invoices/${id}?autoprint=1`, '_blank', 'noopener')}
+                  onClick={() =>
+                    window.open(`/print/invoices/${id}?autoprint=1`, '_blank', 'noopener')
+                  }
                 >
                   <PrinterIcon />
                   Print
                 </Button>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger render={<Button variant="outline" size="icon-sm" aria-label="More actions" />}>
-                    <MoreHorizontalIcon />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {can('invoices:create') ? (
-                      <DropdownMenuItem onClick={onClone}>
-                        <CopyIcon />
-                        Clone
-                      </DropdownMenuItem>
-                    ) : null}
-                    {can('credit_notes:create') && invoice.status === 'sent' ? (
-                      <DropdownMenuItem render={<Link href={`/credit-notes/new?invoiceId=${id}`} />}>
-                        <WalletIcon />
-                        Create credit note
-                      </DropdownMenuItem>
-                    ) : null}
-                    {can('invoices:void') && canPerformInvoiceAction('void', invoice) ? (
-                      <DropdownMenuItem onClick={() => setVoiding(true)}>Void</DropdownMenuItem>
-                    ) : null}
-                    {can('invoices:delete') && canPerformInvoiceAction('delete', invoice) ? (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem variant="destructive" onClick={() => setConfirmDelete(true)}>
-                          Delete
+                {can('invoices:create') ||
+                (can('credit_notes:create') && invoice.status === 'sent') ||
+                (can('invoices:void') && canPerformInvoiceAction('void', invoice)) ||
+                (can('invoices:delete') && canPerformInvoiceAction('delete', invoice)) ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={<Button variant="outline" size="icon-sm" aria-label="More actions" />}
+                    >
+                      <MoreHorizontalIcon />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {can('invoices:create') ? (
+                        <DropdownMenuItem onClick={onClone}>
+                          <CopyIcon />
+                          Clone
                         </DropdownMenuItem>
-                      </>
-                    ) : null}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      ) : null}
+                      {can('credit_notes:create') && invoice.status === 'sent' ? (
+                        <DropdownMenuItem
+                          render={<Link href={`/credit-notes/new?invoiceId=${id}`} />}
+                        >
+                          <WalletIcon />
+                          Create credit note
+                        </DropdownMenuItem>
+                      ) : null}
+                      {can('invoices:void') && canPerformInvoiceAction('void', invoice) ? (
+                        <DropdownMenuItem onClick={() => setVoiding(true)}>Void</DropdownMenuItem>
+                      ) : null}
+                      {can('invoices:delete') && canPerformInvoiceAction('delete', invoice) ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setConfirmDelete(true)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
               </div>
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto bg-muted/30 p-5 sm:p-8">
               {invoice.displayStatus === 'overdue' ? (
                 <p className="mx-auto max-w-[210mm] rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">
-                  Overdue by {daysBetween(invoice.dueDate, today)} days. Due on {formatDate(invoice.dueDate, organization)}.
+                  Overdue by {daysBetween(invoice.dueDate, today)} days. Due on{' '}
+                  {formatDate(invoice.dueDate, organization)}.
                 </p>
               ) : null}
               {invoice.status === 'void' ? (
@@ -439,7 +503,10 @@ export default function InvoiceDetailPage() {
                 <p className="mx-auto flex max-w-[210mm] items-center gap-1.5 text-sm text-muted-foreground">
                   <RefreshCwIcon className="size-4" />
                   Created by recurring invoice{' '}
-                  <Link href={`/recurring-invoices/${invoice.recurringProfile.id}`} className="font-medium text-primary hover:underline">
+                  <Link
+                    href={`/recurring-invoices/${invoice.recurringProfile.id}`}
+                    className="font-medium text-primary hover:underline"
+                  >
                     {invoice.recurringProfile.name}
                   </Link>
                 </p>
@@ -448,7 +515,10 @@ export default function InvoiceDetailPage() {
                 <p className="mx-auto flex max-w-[210mm] items-center gap-1.5 text-sm text-muted-foreground">
                   <FileTextIcon className="size-4" />
                   Created from quote{' '}
-                  <Link href={`/quotes/${invoice.quote.id}`} className="font-medium text-primary hover:underline">
+                  <Link
+                    href={`/quotes/${invoice.quote.id}`}
+                    className="font-medium text-primary hover:underline"
+                  >
                     {invoice.quote.number}
                   </Link>
                 </p>
@@ -475,11 +545,16 @@ export default function InvoiceDetailPage() {
                         <tr key={payment.paymentId} className="border-t">
                           <td className="py-2">{formatDate(payment.paymentDate, organization)}</td>
                           <td className="py-2">
-                            <Link href={`/payments-received/${payment.paymentId}`} className="font-medium text-primary hover:underline">
+                            <Link
+                              href={`/payments-received/${payment.paymentId}`}
+                              className="font-medium text-primary hover:underline"
+                            >
                               {payment.number}
                             </Link>
                           </td>
-                          <td className="py-2 text-muted-foreground">{payment.paymentMode ?? '—'}</td>
+                          <td className="py-2 text-muted-foreground">
+                            {payment.paymentMode ?? '—'}
+                          </td>
                           <td className="py-2 text-right">
                             <Money value={payment.amount} />
                           </td>
@@ -506,7 +581,10 @@ export default function InvoiceDetailPage() {
                         <tr key={credit.applicationId} className="border-t">
                           <td className="py-2">{formatDate(credit.appliedDate, organization)}</td>
                           <td className="py-2">
-                            <Link href={`/credit-notes/${credit.creditNoteId}`} className="font-medium text-primary hover:underline">
+                            <Link
+                              href={`/credit-notes/${credit.creditNoteId}`}
+                              className="font-medium text-primary hover:underline"
+                            >
                               {credit.number}
                             </Link>
                           </td>
@@ -543,7 +621,9 @@ export default function InvoiceDetailPage() {
         onOpenChange={setConfirmDelete}
         title={`Delete draft ${invoice?.number ?? ''}?`}
         description={
-          invoice?.quote ? `Quote ${invoice.quote.number} will return to accepted so it can be converted again.` : 'This cannot be undone.'
+          invoice?.quote
+            ? `Quote ${invoice.quote.number} will return to accepted so it can be converted again.`
+            : 'This cannot be undone.'
         }
         confirmLabel="Delete invoice"
         destructive

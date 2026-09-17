@@ -155,6 +155,17 @@ export interface AuditLogDto {
   createdAt: string;
 }
 
+/** An audit entry in the organization-wide audit log. */
+export interface AuditLogEntryDto extends AuditLogDto {
+  ipAddress: string | null;
+}
+
+export interface AuditLogFiltersDto {
+  entityTypes: string[];
+  actions: string[];
+  users: NamedRef[];
+}
+
 // ---------- Contacts ----------
 
 export interface AddressDto {

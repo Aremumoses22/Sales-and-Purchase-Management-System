@@ -10,6 +10,7 @@
     "build": "pnpm --filter @spms/shared run build && pnpm --filter @spms/api run build && pnpm --filter @spms/web run build",
     "test": "pnpm --filter @spms/shared run build && pnpm --filter @spms/shared --filter @spms/api run test",
     "test:e2e": "pnpm --filter @spms/shared run build && pnpm --filter @spms/api run test:e2e",
+    "test:ui": "pnpm --filter @spms/e2e run test",
     "typecheck": "pnpm --filter @spms/shared run build && pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
     "db:migrate": "pnpm --filter @spms/api run db:migrate",

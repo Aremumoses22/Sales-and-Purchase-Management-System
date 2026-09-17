@@ -29,6 +29,7 @@ const SECTIONS = [
     links: [
       { href: '/settings/users', label: 'Users', permission: 'users:manage' as const },
       { href: '/settings/roles', label: 'Roles', permission: 'users:manage' as const },
+      { href: '/settings/audit-log', label: 'Audit log', permission: 'audit:view' as const },
       { href: '/settings/profile', label: 'My profile' },
     ],
   },
@@ -40,7 +41,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings" description="Company profile, numbering, lists, users and roles." />
+      <PageHeader title="Settings" description="Company profile, numbering, lists, users, roles and the audit log." />
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <nav className="w-full shrink-0 space-y-4 lg:w-56">

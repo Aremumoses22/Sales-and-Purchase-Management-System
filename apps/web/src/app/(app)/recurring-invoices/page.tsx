@@ -3,7 +3,8 @@
 import { RECURRING_PROFILE_DISPLAY_STATUSES, STATUS_LABELS, type RecurringInvoiceListItemDto } from '@spms/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import { cn } from 'cn';
-import { PlusIcon, RefreshCwIcon, SearchIcon, XIcon } from 'lucide-react';
+import { Loader2Icon, PlayIcon, PlusIcon, RefreshCwIcon, SearchIcon, XIcon } from 'lucide-react';
+import { toast } from 'sonner';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { DataTable } from '@/components/data-table';
@@ -14,7 +15,8 @@ import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCustomer } from '@/features/customers/api';
-import { useRecurringInvoices, useRecurringInvoiceStatusCounts } from '@/features/recurring-invoices/api';
+import { useRecurringInvoices, useRecurringInvoiceStatusCounts, useRunDueRecurringInvoices } from '@/features/recurring-invoices/api';
+import { showApiError } from '@/lib/forms';
 import { formatRecurrence } from '@/features/recurring-invoices/format';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { useListQuery } from '@/lib/list-query';
@@ -36,6 +38,16 @@ function CustomerFilterChip({ customerId, onClear }: { customerId: string; onCle
 }
 
 export default function RecurringInvoicesPage() {
+  const runDue = useRunDueRecurringInvoices();
+  const onRunDue = async () => {
+    try {
+      const result = await runDue.mutateAsync();
+      if (result.failed.length) toast.error(`${result.failed.length} profile(s) could not create an invoice; see each profile for why.`);
+      toast.success(result.created.length ? `${result.created.length} invoice(s) created` : 'No invoices were due');
+    } catch (error) {
+      showApiError(error);
+    }
+  };
   const can = useCan();
   const organization = useOrganization();
   const { state, params, update, toggleSort } = useListQuery({ defaultStatus: 'all', defaultSort: 'name', extraKeys: EXTRA_KEYS });
@@ -93,15 +105,23 @@ export default function RecurringInvoicesPage() {
       <PageHeader
         title="Recurring Invoices"
         actions={
-          can('recurring_invoices:create') ? (
-            <Button
-              nativeButton={false}
-              render={<Link href={state['customerId'] ? `/recurring-invoices/new?customerId=${state['customerId']}` : '/recurring-invoices/new'} />}
-            >
-              <PlusIcon />
-              New recurring invoice
-            </Button>
-          ) : null
+          <div className="flex flex-wrap gap-2">
+            {can('recurring_invoices:edit') && can('invoices:create') ? (
+              <Button variant="outline" disabled={runDue.isPending} onClick={onRunDue}>
+                {runDue.isPending ? <Loader2Icon className="animate-spin" /> : <PlayIcon />}
+                Create due invoices now
+              </Button>
+            ) : null}
+            {can('recurring_invoices:create') ? (
+              <Button
+                nativeButton={false}
+                render={<Link href={state['customerId'] ? `/recurring-invoices/new?customerId=${state['customerId']}` : '/recurring-invoices/new'} />}
+              >
+                <PlusIcon />
+                New recurring invoice
+              </Button>
+            ) : null}
+          </div>
         }
       />
 

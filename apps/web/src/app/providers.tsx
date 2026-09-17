@@ -30,7 +30,8 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={getQueryClient()}>
       {children}
-      <Toaster position="top-right" richColors />
+      {/* Bottom-right, so notifications never cover the action buttons in page headers. */}
+      <Toaster position="bottom-right" richColors />
     </QueryClientProvider>
   );
 }

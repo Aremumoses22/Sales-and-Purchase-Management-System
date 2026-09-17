@@ -9,11 +9,25 @@ import {
   type RowData,
 } from '@tanstack/react-table';
 import { cn } from 'cn';
-import { ArrowDownIcon, ArrowUpIcon, ChevronLeftIcon, ChevronRightIcon, Loader2Icon } from 'lucide-react';
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Loader2Icon,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -36,6 +50,10 @@ export interface DataTableProps<T> {
   onPageChange?: (page: number) => void;
   rowHref?: (row: T) => string;
   rowKey: (row: T) => string;
+  /** Called when a row without `rowHref` is clicked. */
+  onRowClick?: (row: T) => void;
+  /** Content shown in a full-width row under a row, e.g. details the user expanded. */
+  renderExpanded?: (row: T) => ReactNode;
   /** A totals row under the data, keyed by column id; columns without an entry stay blank. */
   totals?: Partial<Record<string, ReactNode>>;
 }
@@ -51,11 +69,18 @@ export function DataTable<T>({
   onPageChange,
   rowHref,
   rowKey,
+  onRowClick,
+  renderExpanded,
   totals,
 }: DataTableProps<T>) {
   const router = useRouter();
   const rows = data ?? [];
-  const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel(), getRowId: rowKey });
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: rowKey,
+  });
 
   const from = meta && meta.total > 0 ? (meta.page - 1) * meta.pageSize + 1 : 0;
   const to = meta ? Math.min(meta.page * meta.pageSize, meta.total) : 0;
@@ -109,37 +134,61 @@ export function DataTable<T>({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-32 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-32 text-center text-muted-foreground"
+                >
                   <Loader2Icon className="mx-auto size-5 animate-spin" />
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={columns.length} className="p-0">
-                  {empty ?? <p className="py-12 text-center text-sm text-muted-foreground">Nothing to show yet.</p>}
+                  {empty ?? (
+                    <p className="py-12 text-center text-sm text-muted-foreground">
+                      Nothing to show yet.
+                    </p>
+                  )}
                 </TableCell>
               </TableRow>
             ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className={cn(rowHref && 'cursor-pointer')}
-                  onClick={rowHref ? () => router.push(rowHref(row.original)) : undefined}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className={cn(
-                        'py-2.5',
-                        cell.column.columnDef.meta?.align === 'right' && 'text-right',
-                        cell.column.columnDef.meta?.className,
-                      )}
+              table.getRowModel().rows.map((row) => {
+                const expanded = renderExpanded?.(row.original);
+                return (
+                  <Fragment key={row.id}>
+                    <TableRow
+                      className={cn((rowHref || onRowClick) && 'cursor-pointer')}
+                      onClick={
+                        rowHref
+                          ? () => router.push(rowHref(row.original))
+                          : onRowClick
+                            ? () => onRowClick(row.original)
+                            : undefined
+                      }
                     >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          className={cn(
+                            'py-2.5',
+                            cell.column.columnDef.meta?.align === 'right' && 'text-right',
+                            cell.column.columnDef.meta?.className,
+                          )}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {expanded ? (
+                      <TableRow className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={columns.length} className="whitespace-normal">
+                          {expanded}
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </Fragment>
+                );
+              })
             )}
           </TableBody>
           {totals && !isLoading && rows.length > 0 ? (
@@ -148,7 +197,11 @@ export function DataTable<T>({
                 {table.getVisibleLeafColumns().map((column) => (
                   <TableCell
                     key={column.id}
-                    className={cn('py-2.5', column.columnDef.meta?.align === 'right' && 'text-right', column.columnDef.meta?.className)}
+                    className={cn(
+                      'py-2.5',
+                      column.columnDef.meta?.align === 'right' && 'text-right',
+                      column.columnDef.meta?.className,
+                    )}
                   >
                     {totals[column.id] ?? null}
                   </TableCell>

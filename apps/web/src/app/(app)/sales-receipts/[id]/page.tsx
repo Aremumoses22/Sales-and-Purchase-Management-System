@@ -1,7 +1,14 @@
 'use client';
 
 import { canPerformSalesReceiptAction } from '@spms/shared';
-import { CheckCircle2Icon, CopyIcon, Loader2Icon, MoreHorizontalIcon, PencilIcon, PrinterIcon } from 'lucide-react';
+import {
+  CheckCircle2Icon,
+  CopyIcon,
+  Loader2Icon,
+  MoreHorizontalIcon,
+  PencilIcon,
+  PrinterIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -13,7 +20,14 @@ import { Field } from '@/components/field';
 import { HistoryPanel } from '@/components/history-panel';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,17 +50,34 @@ import { formatDate, formatDateTime } from '@/lib/format';
 import { showApiError } from '@/lib/forms';
 import { useCan, useOrganization } from '@/lib/session';
 
-function VoidDialog({ number, busy, onClose, onConfirm }: { number: string; busy: boolean; onClose: () => void; onConfirm: (reason: string) => void }) {
+function VoidDialog({
+  number,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  number: string;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+}) {
   const [reason, setReason] = useState('');
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Void sales receipt {number}?</DialogTitle>
-          <DialogDescription>The receipt stays on record but no longer counts as a sale, and its stock is returned.</DialogDescription>
+          <DialogDescription>
+            The receipt stays on record but no longer counts as a sale, and its stock is returned.
+          </DialogDescription>
         </DialogHeader>
         <Field label="Reason" htmlFor="void-reason" hint="Optional, recorded in the history.">
-          <Textarea id="void-reason" rows={3} value={reason} onChange={(event) => setReason(event.target.value)} />
+          <Textarea
+            id="void-reason"
+            rows={3}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
         </Field>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>
@@ -137,7 +168,11 @@ export default function SalesReceiptDetailPage() {
 
       <section className="flex min-w-0 flex-1 flex-col">
         {isError ? (
-          <EmptyState title="Sales receipt not found" description="It may have been deleted." className="flex-1" />
+          <EmptyState
+            title="Sales receipt not found"
+            description="It may have been deleted."
+            className="flex-1"
+          />
         ) : isPending || !receipt ? (
           <Loader2Icon className="mx-auto mt-16 size-6 animate-spin text-muted-foreground" />
         ) : (
@@ -149,13 +184,20 @@ export default function SalesReceiptDetailPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                {can('sales_receipts:edit') && canPerformSalesReceiptAction('edit', receipt.status) ? (
-                  <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/sales-receipts/${id}/edit`} />}>
+                {can('sales_receipts:edit') &&
+                canPerformSalesReceiptAction('edit', receipt.status) ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    nativeButton={false}
+                    render={<Link href={`/sales-receipts/${id}/edit`} />}
+                  >
                     <PencilIcon />
                     Edit
                   </Button>
                 ) : null}
-                {can('sales_receipts:edit') && canPerformSalesReceiptAction('complete', receipt.status) ? (
+                {can('sales_receipts:edit') &&
+                canPerformSalesReceiptAction('complete', receipt.status) ? (
                   <Button size="sm" onClick={onComplete} disabled={complete.isPending}>
                     <CheckCircle2Icon />
                     Mark as completed
@@ -164,36 +206,51 @@ export default function SalesReceiptDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(`/print/sales-receipts/${id}?autoprint=1`, '_blank', 'noopener')}
+                  onClick={() =>
+                    window.open(`/print/sales-receipts/${id}?autoprint=1`, '_blank', 'noopener')
+                  }
                 >
                   <PrinterIcon />
                   Print
                 </Button>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger render={<Button variant="outline" size="icon-sm" aria-label="More actions" />}>
-                    <MoreHorizontalIcon />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {can('sales_receipts:create') ? (
-                      <DropdownMenuItem onClick={onClone}>
-                        <CopyIcon />
-                        Clone
-                      </DropdownMenuItem>
-                    ) : null}
-                    {can('sales_receipts:void') && canPerformSalesReceiptAction('void', receipt.status) ? (
-                      <DropdownMenuItem onClick={() => setVoiding(true)}>Void</DropdownMenuItem>
-                    ) : null}
-                    {can('sales_receipts:delete') && canPerformSalesReceiptAction('delete', receipt.status) ? (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem variant="destructive" onClick={() => setConfirmDelete(true)}>
-                          Delete
+                {can('sales_receipts:create') ||
+                (can('sales_receipts:void') &&
+                  canPerformSalesReceiptAction('void', receipt.status)) ||
+                (can('sales_receipts:delete') &&
+                  canPerformSalesReceiptAction('delete', receipt.status)) ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={<Button variant="outline" size="icon-sm" aria-label="More actions" />}
+                    >
+                      <MoreHorizontalIcon />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {can('sales_receipts:create') ? (
+                        <DropdownMenuItem onClick={onClone}>
+                          <CopyIcon />
+                          Clone
                         </DropdownMenuItem>
-                      </>
-                    ) : null}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      ) : null}
+                      {can('sales_receipts:void') &&
+                      canPerformSalesReceiptAction('void', receipt.status) ? (
+                        <DropdownMenuItem onClick={() => setVoiding(true)}>Void</DropdownMenuItem>
+                      ) : null}
+                      {can('sales_receipts:delete') &&
+                      canPerformSalesReceiptAction('delete', receipt.status) ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setConfirmDelete(true)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
               </div>
             </div>
 
@@ -206,7 +263,8 @@ export default function SalesReceiptDetailPage() {
               ) : null}
               {receipt.status === 'draft' ? (
                 <p className="mx-auto max-w-[210mm] rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-900 ring-1 ring-blue-600/20">
-                  This receipt is a draft. Mark it as completed to record the sale and take the goods out of stock.
+                  This receipt is a draft. Mark it as completed to record the sale and take the
+                  goods out of stock.
                 </p>
               ) : null}
 
@@ -222,7 +280,12 @@ export default function SalesReceiptDetailPage() {
       </section>
 
       {voiding && receipt ? (
-        <VoidDialog number={receipt.number} busy={voidReceipt.isPending} onClose={() => setVoiding(false)} onConfirm={onVoid} />
+        <VoidDialog
+          number={receipt.number}
+          busy={voidReceipt.isPending}
+          onClose={() => setVoiding(false)}
+          onConfirm={onVoid}
+        />
       ) : null}
 
       <ConfirmDialog

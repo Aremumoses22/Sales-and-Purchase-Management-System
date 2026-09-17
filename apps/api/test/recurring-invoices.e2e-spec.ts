@@ -217,6 +217,16 @@ describe('Recurring invoices (e2e)', () => {
     expect((await profile(failing.id)).lastError).toMatch(/active customer/i);
   });
 
+  it('creates due invoices on request without duplicating the scheduled run', async () => {
+    const customer = await newCustomer();
+    const profile = await newProfile(customer);
+    const first = (await admin.post(`${API}/recurring-invoices/run-due`).expect(200)).body as { created: { profileId: string }[] };
+    expect(first.created.filter((entry) => entry.profileId === profile.id)).toHaveLength(1);
+    await job.runDue(today);
+    await admin.post(`${API}/recurring-invoices/run-due`).expect(200);
+    expect(await invoicesOf(profile)).toHaveLength(1);
+  });
+
   it('respects role permissions', async () => {
     const customer = await newCustomer();
     const monthly = await newProfile(customer);
@@ -229,5 +239,6 @@ describe('Recurring invoices (e2e)', () => {
     const viewer = await signInAsRole(app, 'Viewer');
     await viewer.post(`${API}/recurring-invoices`).send(profileBody(customer)).expect(403);
     await viewer.post(`${API}/recurring-invoices/${monthly.id}/create-invoice`).expect(403);
+    await viewer.post(`${API}/recurring-invoices/run-due`).expect(403);
   });
 });

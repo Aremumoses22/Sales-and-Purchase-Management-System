@@ -128,7 +128,11 @@ export default function QuoteDetailPage() {
 
       <section className="flex min-w-0 flex-1 flex-col">
         {isError ? (
-          <EmptyState title="Quote not found" description="It may have been deleted." className="flex-1" />
+          <EmptyState
+            title="Quote not found"
+            description="It may have been deleted."
+            className="flex-1"
+          />
         ) : isPending || !quote ? (
           <Loader2Icon className="mx-auto mt-16 size-6 animate-spin text-muted-foreground" />
         ) : (
@@ -141,38 +145,68 @@ export default function QuoteDetailPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 {canEdit && canPerformQuoteAction('edit', quote.status) ? (
-                  <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/quotes/${id}/edit`} />}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    nativeButton={false}
+                    render={<Link href={`/quotes/${id}/edit`} />}
+                  >
                     <PencilIcon />
                     Edit
                   </Button>
                 ) : null}
 
                 {canEdit && status && canPerformQuoteAction('markSent', status) ? (
-                  <Button size="sm" onClick={() => runTransition('mark-sent')} disabled={transition.isPending}>
+                  <Button
+                    size="sm"
+                    onClick={() => runTransition('mark-sent')}
+                    disabled={transition.isPending}
+                  >
                     <SendIcon />
                     Mark as sent
                   </Button>
                 ) : null}
                 {canEdit && status && canPerformQuoteAction('accept', status) ? (
-                  <Button size="sm" onClick={() => runTransition('accept')} disabled={transition.isPending}>
+                  <Button
+                    size="sm"
+                    onClick={() => runTransition('accept')}
+                    disabled={transition.isPending}
+                  >
                     <CheckIcon />
                     Mark as accepted
                   </Button>
                 ) : null}
                 {canEdit && status === 'sent' ? (
-                  <Button variant="outline" size="sm" onClick={() => runTransition('decline')} disabled={transition.isPending}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => runTransition('decline')}
+                    disabled={transition.isPending}
+                  >
                     <XIcon />
                     Declined
                   </Button>
                 ) : null}
-                {status && canPerformQuoteAction('convert', status) && canEdit && can('invoices:create') ? (
+                {status &&
+                canPerformQuoteAction('convert', status) &&
+                canEdit &&
+                can('invoices:create') ? (
                   <Button size="sm" onClick={onConvert} disabled={convert.isPending}>
-                    {convert.isPending ? <Loader2Icon className="animate-spin" /> : <FileOutputIcon />}
+                    {convert.isPending ? (
+                      <Loader2Icon className="animate-spin" />
+                    ) : (
+                      <FileOutputIcon />
+                    )}
                     Convert to invoice
                   </Button>
                 ) : null}
                 {quote.invoice ? (
-                  <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/invoices/${quote.invoice.id}`} />}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    nativeButton={false}
+                    render={<Link href={`/invoices/${quote.invoice.id}`} />}
+                  >
                     <ReceiptIcon />
                     View invoice {quote.invoice.number}
                   </Button>
@@ -181,46 +215,58 @@ export default function QuoteDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(`/print/quotes/${id}?autoprint=1`, '_blank', 'noopener')}
+                  onClick={() =>
+                    window.open(`/print/quotes/${id}?autoprint=1`, '_blank', 'noopener')
+                  }
                 >
                   <PrinterIcon />
                   Print
                 </Button>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger render={<Button variant="outline" size="icon-sm" aria-label="More actions" />}>
-                    <MoreHorizontalIcon />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {can('quotes:create') ? (
-                      <DropdownMenuItem onClick={onClone}>
-                        <CopyIcon />
-                        Clone
-                      </DropdownMenuItem>
-                    ) : null}
-                    {canEdit && status === 'accepted' ? (
-                      <DropdownMenuItem onClick={() => runTransition('decline')}>
-                        <XIcon />
-                        Mark as declined
-                      </DropdownMenuItem>
-                    ) : null}
-                    {can('quotes:delete') && status && canPerformQuoteAction('delete', status) ? (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem variant="destructive" onClick={() => setConfirmDelete(true)}>
-                          Delete
+                {can('quotes:create') ||
+                (canEdit && status === 'accepted') ||
+                (can('quotes:delete') && status && canPerformQuoteAction('delete', status)) ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={<Button variant="outline" size="icon-sm" aria-label="More actions" />}
+                    >
+                      <MoreHorizontalIcon />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {can('quotes:create') ? (
+                        <DropdownMenuItem onClick={onClone}>
+                          <CopyIcon />
+                          Clone
                         </DropdownMenuItem>
-                      </>
-                    ) : null}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      ) : null}
+                      {canEdit && status === 'accepted' ? (
+                        <DropdownMenuItem onClick={() => runTransition('decline')}>
+                          <XIcon />
+                          Mark as declined
+                        </DropdownMenuItem>
+                      ) : null}
+                      {can('quotes:delete') && status && canPerformQuoteAction('delete', status) ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setConfirmDelete(true)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
               </div>
             </div>
 
             <div className="flex-1 space-y-5 overflow-y-auto bg-muted/30 p-5 sm:p-8">
               {quote.displayStatus === 'expired' ? (
                 <p className="mx-auto max-w-[210mm] rounded-lg bg-orange-50 px-4 py-2 text-sm text-orange-800 ring-1 ring-orange-600/20">
-                  This quote expired on {formatDate(quote.expiryDate, organization)}. You can still mark it as accepted or declined.
+                  This quote expired on {formatDate(quote.expiryDate, organization)}. You can still
+                  mark it as accepted or declined.
                 </p>
               ) : null}
 

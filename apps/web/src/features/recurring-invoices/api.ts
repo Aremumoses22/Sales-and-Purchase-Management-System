@@ -2,6 +2,7 @@
 
 import type {
   AuditLogDto,
+  RecurringRunResultDto,
   InvoiceDto,
   Paginated,
   RecurringInvoiceDto,
@@ -90,6 +91,14 @@ export function useDeleteRecurringInvoice() {
   const invalidate = useInvalidateRecurringInvoices();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/recurring-invoices/${id}`),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useRunDueRecurringInvoices() {
+  const invalidate = useInvalidateRecurringInvoices();
+  return useMutation({
+    mutationFn: () => api.post<RecurringRunResultDto>('/recurring-invoices/run-due'),
     onSuccess: () => invalidate(),
   });
 }
