@@ -54,5 +54,5 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/payments-made', label: 'Payments Made', icon: BanknoteArrowUpIcon, permission: 'payments_made:view' },
     ],
   },
-  { items: [{ href: '/reports', label: 'Reports', icon: ChartColumnIcon, permission: 'reports:view', soon: true }] },
+  { items: [{ href: '/reports', label: 'Reports', icon: ChartColumnIcon, permission: 'reports:view' }] },
 ];

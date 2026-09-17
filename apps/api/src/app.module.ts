@@ -15,6 +15,7 @@ import { CreditNotesModule } from './modules/credit-notes/credit-notes.module.js
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { SalesReceiptsModule } from './modules/sales-receipts/sales-receipts.module.js';
 import { QuotesModule } from './modules/quotes/quotes.module.js';
+import { ReportsModule } from './modules/reports/reports.module.js';
 import { RecurringInvoicesModule } from './modules/recurring-invoices/recurring-invoices.module.js';
 import { SearchController } from './modules/search/search.controller.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
@@ -40,6 +41,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     RecurringInvoicesModule,
     ExpensesModule,
     BillsModule,
+    ReportsModule,
   ],
   controllers: [HealthController, SearchController],
   providers: [

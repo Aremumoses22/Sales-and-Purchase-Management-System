@@ -19,7 +19,8 @@ A web app for managing customers, items, quotes, invoices, payments, vendors and
 | 10 Vendors | Vendors with contacts, addresses and payables, shared with the customer screens; preferred vendor on items | Done |
 | 11 Expenses | Expenses by category with tax (inclusive or exclusive), paid-through, vendor, receipt upload and preview, filters with totals | Done |
 | 11b Bills and Payments Made | Vendor bills with due dates, overdue tracking and stock receipt; payments made across bills with unused credit; vendor payables | Done |
-| 12–14 | Dashboard, reports, hardening | Planned |
+| 13 Reports | Sales by customer and item, invoice details, customer statement and balances, AR aging, payments received, credit notes, expenses by category and vendor, vendor balances; date presets, totals, CSV export and print | Done |
+| 12, 14 | Dashboard, hardening | Planned |
 
 ## Stack
 

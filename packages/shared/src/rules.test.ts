@@ -15,6 +15,7 @@ import { documentLineSchema, invoiceSchema, quoteSchema } from './schemas/docume
 import { itemSchema } from './schemas/items.js';
 import { applyCreditNoteSchema } from './schemas/credit-notes.js';
 import { paymentReceivedSchema } from './schemas/payments.js';
+import { dateRangeForPreset } from './reports.js';
 import { billSchema, paymentMadeSchema } from './schemas/bills.js';
 import { expenseSchema } from './schemas/expenses.js';
 import { recurringInvoiceSchema } from './schemas/recurring-invoices.js';
@@ -382,5 +383,22 @@ describe('bills', () => {
     expect(
       paymentMadeSchema.safeParse({ vendorId, paymentDate: '2026-09-16', amount: '100', allocations: [{ billId, amount: '100.01' }] }).success,
     ).toBe(false);
+  });
+});
+
+describe('report date ranges', () => {
+  it('works out calendar ranges from today', () => {
+    const today = '2026-09-17'; // a Thursday
+    expect(dateRangeForPreset('today', today)).toEqual({ from: today, to: today });
+    expect(dateRangeForPreset('this_week', today)).toEqual({ from: '2026-09-14', to: '2026-09-20' });
+    expect(dateRangeForPreset('this_month', today)).toEqual({ from: '2026-09-01', to: '2026-09-30' });
+    expect(dateRangeForPreset('last_month', today)).toEqual({ from: '2026-08-01', to: '2026-08-31' });
+    expect(dateRangeForPreset('this_quarter', today)).toEqual({ from: '2026-07-01', to: '2026-09-30' });
+    expect(dateRangeForPreset('last_quarter', today)).toEqual({ from: '2026-04-01', to: '2026-06-30' });
+    expect(dateRangeForPreset('this_year', today)).toEqual({ from: '2026-01-01', to: '2026-12-31' });
+    expect(dateRangeForPreset('last_year', today)).toEqual({ from: '2025-01-01', to: '2025-12-31' });
+    expect(dateRangeForPreset('last_month', '2026-03-31')).toEqual({ from: '2026-02-01', to: '2026-02-28' });
+    expect(dateRangeForPreset('last_quarter', '2026-02-10')).toEqual({ from: '2025-10-01', to: '2025-12-31' });
+    expect(dateRangeForPreset('this_week', '2026-09-20')).toEqual({ from: '2026-09-14', to: '2026-09-20' });
   });
 });

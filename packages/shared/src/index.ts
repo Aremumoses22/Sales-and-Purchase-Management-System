@@ -17,3 +17,4 @@ export * from './schemas/sales-receipts.js';
 export * from './schemas/recurring-invoices.js';
 export * from './schemas/expenses.js';
 export * from './schemas/bills.js';
+export * from './reports.js';
