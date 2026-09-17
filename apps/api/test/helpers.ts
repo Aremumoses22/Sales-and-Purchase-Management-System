@@ -17,7 +17,9 @@ export async function createTestApp(): Promise<NestExpressApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ logger: ['error', 'warn'] });
   configureApp(app);
-  await app.init();
+  // Listen once on a private port. Without this, supertest starts a throwaway listener for every
+  // request, and a port freed by one request can be picked up by another process before the next.
+  await app.listen(0, '127.0.0.1');
   return app;
 }
 

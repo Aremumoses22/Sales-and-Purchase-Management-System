@@ -1,4 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { todayInTimeZone } from '@spms/shared';
 import type { ItemDto, ItemListItemDto, Paginated, StockMovementDto, TaxDto } from '@spms/shared';
 import { API, createTestApp, signIn, signInAsRole, unique, type Agent } from './helpers.js';
 
@@ -89,8 +90,12 @@ describe('Items and stock (e2e)', () => {
 
   it('adjusts stock up and down but never below zero', async () => {
     const item = (await admin.post(`${API}/items`).send(goods(unique('Bolt'))).expect(201)).body as ItemDto;
+    // Opening stock is dated today in the organization's time zone; adjust on the same day so the
+    // newest-first order depends only on when each movement was recorded.
+    const { timezone } = (await admin.get(`${API}/settings/organization`).expect(200)).body as { timezone: string };
+    const today = todayInTimeZone(timezone);
     const adjust = (quantityChange: string) =>
-      admin.post(`${API}/items/${item.id}/stock-adjustments`).send({ date: '2026-09-16', quantityChange, reason: 'Stock count' });
+      admin.post(`${API}/items/${item.id}/stock-adjustments`).send({ date: today, quantityChange, reason: 'Stock count' });
 
     expect(((await adjust('5').expect(201)).body as ItemDto).stockOnHand).toBe('15');
     expect(((await adjust('-12').expect(201)).body as ItemDto).stockOnHand).toBe('3');
