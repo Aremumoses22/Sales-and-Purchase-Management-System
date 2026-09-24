@@ -5,6 +5,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { AllExceptionsFilter } from './common/exception.filter.js';
 import { requestContextMiddleware } from './common/request-context.js';
 import { createValidationPipe } from './common/validation.js';
+import { config } from './config.js';
 import { ACCESS_COOKIE } from './modules/auth/cookies.js';
 
 export const API_PREFIX = 'api/v1';
@@ -21,8 +22,8 @@ export function configureApp(app: NestExpressApplication): void {
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     next();
   });
-  // Browsers reach the API through the Next.js server on the same machine; trust it for client IPs.
-  app.set('trust proxy', 'loopback');
+  // Browsers reach the API through the Next.js server; trust it (and any proxy in front of it) for client IPs.
+  app.set('trust proxy', config.trustProxy);
   app.useBodyParser('json', { limit: '1mb' });
   app.use(cookieParser());
   app.use(requestContextMiddleware);

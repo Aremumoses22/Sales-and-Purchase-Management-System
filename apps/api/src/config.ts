@@ -14,6 +14,11 @@ export const config = {
   port: Number(process.env['PORT'] ?? 4000),
   /** Behind the web app in production, listen on 127.0.0.1 so the API is not reachable directly. */
   host: process.env['HOST'] ?? '0.0.0.0',
+  /**
+   * Express `trust proxy` value: which hops may set X-Forwarded-For. `loopback` when the web app runs on the
+   * same machine; `loopback, uniquelocal` when it reaches the API over a private network (Render).
+   */
+  trustProxy: process.env['TRUST_PROXY'] ?? 'loopback',
   /** Interactive API docs at /api/docs; off in production unless asked for. */
   apiDocsEnabled: (process.env['API_DOCS_ENABLED'] ?? (production ? 'false' : 'true')) === 'true',
   databaseUrl: required('DATABASE_URL'),

@@ -1,0 +1,87 @@
+# Render Blueprint: the web app (public), the API (private network only), PostgreSQL and a disk for uploads.
+# Deploy: Render dashboard → New → Blueprint → pick this repository. See docs/DEPLOYMENT.md#render.
+#
+# browser ──HTTPS──▶ spms-web (Next.js) ──/api/*──▶ spms-api (NestJS, private) ──▶ spms-db (PostgreSQL)
+
+databases:
+  - name: spms-db
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "16"
+    databaseName: spms
+    user: spms
+    ipAllowList: [] # reachable only from services in this account
+
+services:
+  - type: pserv
+    name: spms-api
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: >-
+      npm install -g pnpm@12.4.2 &&
+      pnpm install --frozen-lockfile --prod=false &&
+      pnpm --filter @spms/shared run build &&
+      pnpm --filter @spms/api run build
+    # Applies migrations, then creates roles, lists and the first admin if there is no user yet (safe to rerun).
+    preDeployCommand: cd apps/api && npx prisma migrate deploy && npx prisma db seed
+    startCommand: cd apps/api && node dist/main.js
+    disk:
+      name: uploads
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: spms-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "4000"
+      # Requests arrive from spms-web over Render's private network, not loopback.
+      - key: TRUST_PROXY
+        value: loopback, uniquelocal
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: RECURRING_JOB_ENABLED
+        value: "true"
+      # Asked for when the Blueprint is created; used once to create the first admin.
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+
+  - type: web
+    name: spms-web
+    runtime: node
+    plan: starter
+    region: frankfurt
+    # API_HOST must be set at build time: Next fixes the /api forwarding when it builds.
+    buildCommand: >-
+      npm install -g pnpm@12.4.2 &&
+      pnpm install --frozen-lockfile --prod=false &&
+      pnpm --filter @spms/shared run build &&
+      pnpm --filter @spms/web run build
+    startCommand: cd apps/web && node_modules/.bin/next start --hostname 0.0.0.0 --port $PORT
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: API_HOST
+        fromService:
+          type: pserv
+          name: spms-api
+          property: host
+      - key: API_PORT
+        value: "4000"

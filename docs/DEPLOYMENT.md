@@ -1,6 +1,6 @@
 # Deployment guide
 
-This guide sets the system up on one Linux server (Ubuntu 24.04 is assumed) with PostgreSQL, the API and the web app on the same machine behind nginx with HTTPS. It is enough for a business with a handful of users; see [Scaling](#scaling) for more.
+This guide sets the system up on one Linux server (Ubuntu 24.04 is assumed) with PostgreSQL, the API and the web app on the same machine behind nginx with HTTPS. It is enough for a business with a handful of users; see [Scaling](#scaling) for more. To run it on Render instead, see [Render](#render).
 
 ```text
 browser ──HTTPS──▶ nginx :443 ──▶ web (Next.js) 127.0.0.1:3000 ──/api/*──▶ API (NestJS) 127.0.0.1:4000 ──▶ PostgreSQL
@@ -214,3 +214,30 @@ Migrations only add to the schema or change it in place; read `apps/api/prisma/m
 - Uploads are stored on local disk. With more than one API server, point `UPLOAD_DIR` at shared storage.
 - Sign-in attempt limits are kept in each API process's memory; with several API processes each keeps its own count.
 - PostgreSQL can move to a managed service by changing `DATABASE_URL`; keep backups and point-in-time recovery turned on there.
+
+## Render
+
+[`render.yaml`](../render.yaml) is a Render Blueprint that sets up the same layout without a server to look after:
+
+| Resource | Type | What it does |
+|---|---|---|
+| `spms-web` | Web service (public, HTTPS) | Next.js; forwards `/api/*` to the API over Render's private network |
+| `spms-api` | Private service | NestJS API with a 1 GB disk at `/var/data` for uploads; not reachable from the internet |
+| `spms-db` | PostgreSQL 16 | Reachable only from services in the same account |
+
+All three are in the Frankfurt region, the closest to West Africa; change `region` on every entry together if you want another.
+
+1. Push the repository to GitHub.
+2. In the Render dashboard choose **New → Blueprint**, connect GitHub and pick the repository.
+3. Enter `SEED_ADMIN_EMAIL` and a strong `SEED_ADMIN_PASSWORD` when asked. `JWT_SECRET` is generated for you.
+4. Apply. The API is built first; before it starts, its pre-deploy step applies migrations and creates the first admin. The web app is built with the API's private hostname (`API_HOST`), so if the web app was built before the API existed, choose **Manual Deploy → Clear build cache & deploy** on `spms-web` once.
+5. Open the `spms-web` URL (`https://spms-web-….onrender.com`), sign in and change the password. To use your own domain, add it under `spms-web` → **Settings → Custom Domains**.
+
+Every push to `main` redeploys both services. Migrations run automatically on each API deploy.
+
+Notes:
+
+- The API needs a paid instance for a private service and a disk, and Render's free PostgreSQL is deleted after 30 days, so the Blueprint uses the Starter and Basic plans. See Render's pricing page for current prices.
+- Because the API has a disk, Render stops the old instance before starting the new one, so each API deploy has a short gap.
+- Render backs up paid PostgreSQL databases (see the database's **Recovery** tab). The uploads disk has daily snapshots; for your own copies, use `pg_dump` with the external connection string and download the disk contents from the service's **Shell**.
+- `TRUST_PROXY=loopback, uniquelocal` lets the API take the client IP from the web app's `X-Forwarded-For` header, which it reaches over a private address, so the audit log and sign-in limits see real client IPs.
