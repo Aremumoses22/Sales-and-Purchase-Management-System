@@ -146,4 +146,4 @@ The API end-to-end tests refuse to run unless the database name ends in `_test`.
 
 ## Deployment
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for a production setup on a single Linux server (build, environment, database, services, HTTPS, backups and upgrades), or [deploy to Render](docs/DEPLOYMENT.md#render) with the included `render.yaml` Blueprint.
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for a production setup on a single Linux server (build, environment, database, services, HTTPS, backups and upgrades), or [deploy to Render](docs/DEPLOYMENT.md#render) with the included `render.yaml` Blueprint ([`render.free.yaml`](docs/DEPLOYMENT.md#free-trial-on-render) for a free trial).

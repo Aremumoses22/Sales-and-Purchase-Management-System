@@ -1,0 +1,56 @@
+# Render Blueprint for a free trial: one free web service running both the web app and the API, plus a free
+# PostgreSQL. Deploy: Render dashboard → New → Blueprint → this repository, Blueprint path `render.free.yaml`.
+# Limits (see docs/DEPLOYMENT.md#free-trial-on-render): sleeps after 15 idle minutes, uploads are lost on every
+# restart, and Render deletes the free database 30 days after it is created. render.yaml is the paid setup.
+
+databases:
+  - name: spms-trial-db
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "16"
+    databaseName: spms
+    user: spms
+    ipAllowList: [] # reachable only from services in this account
+
+services:
+  - type: web
+    name: spms-trial
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: >-
+      npm install -g pnpm@12.4.2 &&
+      pnpm install --frozen-lockfile --prod=false &&
+      pnpm build
+    startCommand: bash scripts/render-free-start.sh
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: spms-trial-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      # The API runs next to the web app on 127.0.0.1:API_PORT; the web app is built to forward /api/* there.
+      - key: API_PORT
+        value: "4000"
+      - key: API_URL
+        value: http://127.0.0.1:4000
+      # Client IPs arrive through Render's proxy (private address) and then the web app (loopback).
+      - key: TRUST_PROXY
+        value: loopback, uniquelocal
+      - key: UPLOAD_DIR
+        value: /tmp/spms-uploads
+      - key: RECURRING_JOB_ENABLED
+        value: "true"
+      # Asked for when the Blueprint is created; used once to create the first admin.
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false

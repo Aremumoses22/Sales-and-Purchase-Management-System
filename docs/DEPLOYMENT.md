@@ -1,6 +1,6 @@
 # Deployment guide
 
-This guide sets the system up on one Linux server (Ubuntu 24.04 is assumed) with PostgreSQL, the API and the web app on the same machine behind nginx with HTTPS. It is enough for a business with a handful of users; see [Scaling](#scaling) for more. To run it on Render instead, see [Render](#render).
+This guide sets the system up on one Linux server (Ubuntu 24.04 is assumed) with PostgreSQL, the API and the web app on the same machine behind nginx with HTTPS. It is enough for a business with a handful of users; see [Scaling](#scaling) for more. To run it on Render instead, see [Render](#render), or try it for free first with [Free trial on Render](#free-trial-on-render).
 
 ```text
 browser ──HTTPS──▶ nginx :443 ──▶ web (Next.js) 127.0.0.1:3000 ──/api/*──▶ API (NestJS) 127.0.0.1:4000 ──▶ PostgreSQL
@@ -241,3 +241,19 @@ Notes:
 - Because the API has a disk, Render stops the old instance before starting the new one, so each API deploy has a short gap.
 - Render backs up paid PostgreSQL databases (see the database's **Recovery** tab). The uploads disk has daily snapshots; for your own copies, use `pg_dump` with the external connection string and download the disk contents from the service's **Shell**.
 - `TRUST_PROXY=loopback, uniquelocal` lets the API take the client IP from the web app's `X-Forwarded-For` header, which it reaches over a private address, so the audit log and sign-in limits see real client IPs.
+
+## Free trial on Render
+
+[`render.free.yaml`](../render.free.yaml) runs everything on Render's free plan so you can try the system before paying. Render's free plan has no private services, disks or pre-deploy step, so one free web service (`spms-trial`) runs both the API and the web app ([`scripts/render-free-start.sh`](../scripts/render-free-start.sh)), with the API on `127.0.0.1` as on a single server. It applies migrations and creates the first admin each time it starts.
+
+1. In the Render dashboard choose **New → Blueprint**, connect GitHub and pick the repository.
+2. Set **Blueprint Path** to `render.free.yaml`.
+3. Enter `SEED_ADMIN_EMAIL` and a strong `SEED_ADMIN_PASSWORD` when asked, then apply.
+4. Open the `spms-trial` URL and sign in.
+
+What to expect on the free plan:
+
+- **It sleeps** after 15 minutes without visitors; the next visit takes about a minute to wake it. Recurring invoices that fall due while it sleeps are created when it wakes.
+- **Uploads don't last:** the organization logo and expense receipts are lost whenever the service restarts, redeploys or sleeps. Everything else is in the database.
+- **The database is deleted** 30 days after it is created (Render emails you first). To keep your data, move to [`render.yaml`](#render) before then: create that Blueprint, copy the data across with `pg_dump` and `pg_restore` using the two databases' external connection strings, then delete the trial.
+- **Memory is tight:** both processes share 512 MB. If the logs show the service being restarted for running out of memory, use the paid Blueprint.
